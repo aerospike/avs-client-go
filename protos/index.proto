@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package aerospike.vector;
+
+option go_package = "aerospike.com/vector/protos/";
+option java_package = "com.aerospike.vector.client";
+option java_multiple_files = true;
+
+import "google/protobuf/empty.proto";
+import "types.proto";
+
+message IndexStatusResponse {
+  // Number of unmerged index records.
+  int64 unmergedRecordCount = 2;
+}
+
+// Service to manage indices.
+service IndexService {
+  // Create an index.
+  rpc Create(IndexDefinition) returns (google.protobuf.Empty) {}
+
+  // Drop an index.
+  rpc Drop(IndexId) returns (google.protobuf.Empty) {}
+
+  // List available indices.
+  rpc List(google.protobuf.Empty) returns (IndexDefinitionList) {}
+
+  // Get the index definition.
+  rpc Get(IndexId) returns (IndexDefinition) {}
+
+  // Query status of an index.
+  // NOTE: API is subject to change.
+  rpc GetStatus(IndexId) returns (IndexStatusResponse) {}
+}
