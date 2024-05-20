@@ -242,7 +242,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 
 			clusterID, err := client.GetClusterId(context.Background(), nil)
 			if err != nil {
-				cp.logger.Warn("failed to get cluster ID: %v", err)
+				cp.logger.Warn("failed to get cluster ID", slog.Any("error", err))
 			}
 
 			if !cp.checkAndSetClusterID(clusterID.GetId()) {
@@ -254,7 +254,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 
 			endpointsResp, err := client.GetClusterEndpoints(context.Background(), endpointsReq)
 			if err != nil {
-				cp.logger.Error("failed to get cluster endpoints: %v", err)
+				cp.logger.Error("failed to get cluster endpoints", slog.Any("error", err))
 				return
 			}
 
@@ -295,8 +295,10 @@ func (cp *ChannelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 					addNewConn = false
 				} else {
 					cp.logger.Debug("endpoints for node changed, recreating channel", slog.Uint64("node", node))
-					currEndpoints.Channel.Close()
+
 					addNewConn = true
+
+					currEndpoints.Channel.Close()
 				}
 			}
 
