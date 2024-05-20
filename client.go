@@ -1,46 +1,83 @@
-package aerospike_vector_search
+package avs
 
 import (
+	"context"
+	"log/slog"
+
 	"github.com/aerospike/aerospike-proximus-client-go/protos"
-	"golang.org/x/crypto/openpgp/errors"
 )
 
+//nolint:govet // We will favor readability over field alignment
 type Client struct {
+	logger         *slog.Logger
 	seeds          []HostPort
 	listenerName   string
 	isLoadBalancer bool
 }
 
-func NewClient(seeds []HostPort, listenerName string, isLoadBalancer bool) *Client {
+//nolint:revive // TODO
+func NewClient(
+	ctx context.Context,
+	seeds []HostPort,
+	listenerName string,
+	isLoadBalancer bool,
+	logger *slog.Logger,
+) *Client {
+	logger = logger.WithGroup("aerospike_vector_search")
+
 	return &Client{
 		seeds:          seeds,
 		listenerName:   listenerName,
 		isLoadBalancer: isLoadBalancer,
+		logger:         logger,
 	}
 }
 
-func (c *Client) Get(namespace string, setName string, key interface{}, binNames []string) (*protos.Record, error) {
-	return nil, errors.UnsupportedError("get() is not implemented")
+//nolint:revive // TODO
+func (c *Client) Get(ctx context.Context,
+	namespace,
+	setName string,
+	key interface{},
+	binNames []string,
+) (*protos.Record, error) {
+	return nil, ErrNotImplemented
 }
 
-func (c *Client) Delete(namespace string, setName string, key interface{}) (*protos.Record, error) {
-	return nil, errors.UnsupportedError("delete() is not implemented")
+//nolint:revive // TODO
+func (c *Client) Delete(ctx context.Context, namespace, setName string, key interface{}) (*protos.Record, error) {
+	return nil, ErrNotImplemented
 }
 
-func (c *Client) Exists(namespace string, setName string, key interface{}) (bool, error) {
-	return false, errors.UnsupportedError("exists() is not implemented")
+//nolint:revive // TODO
+func (c *Client) Exists(
+	ctx context.Context,
+	namespace,
+	setName string,
+	key interface{},
+) (bool, error) {
+	return false, ErrNotImplemented
 }
 
-func (c *Client) IsIndexed(namespace string, setName string, indexName string, key interface{}) (bool, error) {
-	return false, errors.UnsupportedError("IsIndexed() is not implemented")
+//nolint:revive // TODO
+func (c *Client) IsIndexed(ctx context.Context, namespace, setName, indexName string, key interface{}) (bool, error) {
+	return false, ErrNotImplemented
 }
 
-func (c *Client) VectorSearch(namespace string, indexName string, query []float32, limit int, searchParams *protos.HnswSearchParams, binNames []string) ([]*protos.Neighbor, error) {
-	return nil, errors.UnsupportedError("vectorSearch() is not implemented")
+//nolint:revive // TODO
+func (c *Client) VectorSearch(ctx context.Context,
+	namespace,
+	indexName string,
+	query []float32,
+	limit int,
+	searchParams *protos.HnswSearchParams,
+	binNames []string,
+) ([]*protos.Neighbor, error) {
+	return nil, ErrNotImplemented
 }
 
-func (c *Client) WaitForIndexCompletion(namespace string, indexName string, timeout int) error {
-	return errors.UnsupportedError("WaitForIndexCompletion() is not implemented")
+//nolint:revive // TODO
+func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexName string, timeout int) error {
+	return ErrNotImplemented
 }
 
 func (c *Client) Close() {
