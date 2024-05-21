@@ -13,6 +13,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type ChannelAndEndpoints struct {
@@ -36,7 +37,7 @@ type ChannelProvider struct {
 	tendLock        *sync.RWMutex
 	tendInterval    int // in seconds
 	clusterID       uint64
-	listenerName    string
+	listenerName    *string
 	isLoadBalancer  bool
 	stopTendChan    chan struct{}
 	tendStoppedChan chan struct{}
@@ -46,7 +47,7 @@ type ChannelProvider struct {
 func NewChannelProvider(
 	ctx context.Context,
 	seeds []*HostPort,
-	listenerName string,
+	listenerName *string,
 	isLoadBalancer bool,
 	logger *slog.Logger,
 ) (*ChannelProvider, error) {
@@ -78,6 +79,7 @@ func NewChannelProvider(
 	}
 
 	if !isLoadBalancer {
+		cp.updateClusterChannels() // We want at least one tend to occur before we return
 		go cp.tend()
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
@@ -146,8 +148,6 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	wg := sync.WaitGroup{}
 	seedCons := make(chan *grpc.ClientConn)
 	cp.seedConns = []*grpc.ClientConn{}
-
-	defer close(seedCons)
 
 	for _, seed := range cp.seeds {
 		wg.Add(1)
@@ -240,7 +240,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 
 			client := protos.NewClusterInfoClient(conn)
 
-			clusterID, err := client.GetClusterId(context.Background(), nil)
+			clusterID, err := client.GetClusterId(context.TODO(), &emptypb.Empty{})
 			if err != nil {
 				cp.logger.Warn("failed to get cluster ID", slog.Any("error", err))
 			}
@@ -250,7 +250,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 				return
 			}
 
-			endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: &cp.listenerName}
+			endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
 
 			endpointsResp, err := client.GetClusterEndpoints(context.Background(), endpointsReq)
 			if err != nil {
