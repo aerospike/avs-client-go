@@ -402,10 +402,6 @@ func createChannelFromEndpoints(
 }
 
 func createChannel(ctx context.Context, hostPort *HostPort) (*grpc.ClientConn, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	conn, err := grpc.DialContext(
 		ctx,
 		hostPortToDialString(hostPort),

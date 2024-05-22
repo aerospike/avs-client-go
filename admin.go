@@ -2,7 +2,6 @@ package avs
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -29,7 +28,7 @@ func NewAdminClient(
 	channelProvider, err := NewChannelProvider(ctx, seeds, listenerName, isLoadBalancer, logger)
 	if err != nil {
 		logger.Error("failed to create channel provider", slog.Any("error", err))
-		return nil, err
+		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
 	}
 
 	return &AdminClient{
@@ -59,7 +58,7 @@ func (c *AdminClient) IndexCreate(
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		logger.Error("failed to create index", slog.Any("error", err))
-		return NewAVSErrorFromGrpc(err)
+		return NewAVSErrorFromGrpc("failed to create index", err)
 	}
 
 	var set *string
@@ -90,13 +89,7 @@ func (c *AdminClient) IndexCreate(
 	_, err = client.Create(ctx, indexDef)
 	if err != nil {
 		logger.Error("failed to create index", slog.Any("error", err))
-
-		code := status.Code(err)
-		if code == codes.AlreadyExists {
-			return NewAVSError("index already exists")
-		}
-
-		return NewAVSErrorFromGrpc(err)
+		return NewAVSErrorFromGrpc("failed to create index", err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*100_000)
@@ -110,9 +103,10 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
-		logger.Error("failed to drop index", slog.Any("error", err))
+		msg := "failed to drop index"
+		logger.Error(msg, slog.Any("error", err))
 
-		return NewAVSErrorFromGrpc(err)
+		return NewAVSErrorFromGrpc(msg, err)
 	}
 
 	indexID := &protos.IndexId{
@@ -124,9 +118,11 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 
 	_, err = client.Drop(ctx, indexID)
 	if err != nil {
-		logger.Error("failed to drop index", slog.Any("error", err))
+		msg := "failed to drop index"
 
-		return NewAVSErrorFromGrpc(err)
+		logger.Error(msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*100_000)
@@ -138,15 +134,18 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
-		c.logger.Error("failed to get indexes", slog.Any("error", err))
-		return nil, NewAVSErrorFromGrpc(err)
+		msg := "failed to get indexes"
+		c.logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	client := protos.NewIndexServiceClient(conn)
 
 	indexList, err := client.List(ctx, nil)
 	if err != nil {
-		return nil, NewAVSErrorFromGrpc(err)
+		msg := "failed to get indexes"
+		c.logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	return indexList, nil
@@ -157,8 +156,9 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
-		logger.Error("failed to get index", slog.Any("error", err))
-		return nil, NewAVSErrorFromGrpc(err)
+		msg := "failed to get index"
+		logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	indexID := &protos.IndexId{
@@ -169,13 +169,10 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 
 	indexDef, err := client.Get(ctx, indexID)
 	if err != nil {
-		code := status.Code(err)
+		msg := "failed to get index"
+		logger.Error(msg, slog.Any("error", err))
 
-		if code == codes.NotFound {
-			return nil, NewAVSError(fmt.Sprintf("failed to get index %s.%s: %s", namespace, name, code.String()))
-		}
-
-		return nil, NewAVSErrorFromGrpc(err)
+		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	return indexDef, nil
@@ -186,8 +183,9 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
-		logger.Error("failed to get index status", slog.Any("error", err))
-		return nil, NewAVSErrorFromGrpc(err)
+		msg := "failed to get index status"
+		logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	indexID := &protos.IndexId{
@@ -198,14 +196,10 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 
 	indexStatus, err := client.GetStatus(ctx, indexID)
 	if err != nil {
-		logger.Error("failed to get index status", slog.Any("error", err))
+		msg := "failed to get index status"
+		logger.Error(msg, slog.Any("error", err))
 
-		code := status.Code(err)
-		if code == codes.NotFound {
-			return nil, NewAVSError(fmt.Sprintf("failed to get index status: %s", code.String()))
-		}
-
-		return nil, NewAVSErrorFromGrpc(err)
+		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	return indexStatus, nil
@@ -220,8 +214,9 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
-		logger.Error("failed to wait for index creation", slog.Any("error", err))
-		return NewAVSErrorFromGrpc(err)
+		msg := "failed to wait for index creation"
+		logger.Error(msg, slog.Any("error", err))
+		return NewAVSErrorFromGrpc(msg, err)
 	}
 
 	indexID := &protos.IndexId{
@@ -244,8 +239,9 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 					return ctx.Err()
 				}
 			} else {
-				logger.Error("unable to wait for index creation", slog.Any("error", err))
-				return NewAVSErrorFromGrpc(err)
+				msg := "unable to wait for index creation, an unexpected error occurred"
+				logger.Error(msg, slog.Any("error", err))
+				return NewAVSErrorFromGrpc(msg, err)
 			}
 		} else {
 			logger.Info("index has been created")
@@ -261,8 +257,9 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
-		logger.Error("failed to wait for index creation", slog.Any("error", err))
-		return NewAVSErrorFromGrpc(err)
+		msg := "failed to wait for index deletion"
+		logger.Error(msg, slog.Any("error", err))
+		return NewAVSErrorFromGrpc(msg, err)
 	}
 
 	indexID := &protos.IndexId{
@@ -281,12 +278,13 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 				return nil
 			}
 
-			logger.Error("unable to wait for index deletion, an unexpected error occurred", slog.Any("error", err))
+			msg := "unable to wait for index deletion, an unexpected error occurred"
+			logger.Error(msg, slog.Any("error", err))
 
-			return NewAVSErrorFromGrpc(err)
+			return NewAVSErrorFromGrpc(msg, err)
 		}
 
-		c.logger.Info("index still exists, waiting...")
+		c.logger.Debug("index still exists, waiting...")
 		select {
 		case <-time.After(waitInterval):
 		case <-ctx.Done():

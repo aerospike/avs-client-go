@@ -10,23 +10,28 @@ type Error struct {
 	msg string
 }
 
-func NewAVSError(msg string) *Error {
+func NewAVSError(msg string) error {
 	return &Error{msg: msg}
 }
 
-func NewAVSErrorFromGrpc(gErr error) *Error {
-	status := status.Convert(gErr)
+func NewAVSErrorFromGrpc(msg string, gErr error) error {
+	status, ok := status.FromError(gErr)
 
-	if status.Err() == nil {
+	if gErr == nil {
 		return nil
 	}
 
-	errStr := fmt.Sprintf("avs server error: code=%s", status.Code().String())
-	msg := status.Message()
+	if !ok {
+		// Should we instead return
+		return NewAVSError(gErr.Error())
+	}
+
+	errStr := fmt.Sprintf("%s: avs server error: code=%s", msg, status.Code().String())
+	gMsg := status.Message()
 	details := status.Details()
 
-	if msg != "" {
-		errStr = fmt.Sprintf(", msg=%s", msg)
+	if gMsg != "" {
+		errStr = fmt.Sprintf(", msg=%s", gMsg)
 	}
 
 	if len(details) > 0 {
@@ -37,5 +42,5 @@ func NewAVSErrorFromGrpc(gErr error) *Error {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("avs error: %v", e.msg)
+	return e.msg
 }
