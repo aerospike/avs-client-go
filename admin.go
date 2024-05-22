@@ -173,7 +173,6 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 	if err != nil {
 		msg := "failed to get index"
 		logger.Error(msg, slog.Any("error", err))
-
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -201,7 +200,6 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	if err != nil {
 		msg := "failed to get index status"
 		logger.Error(msg, slog.Any("error", err))
-
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -233,7 +231,6 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 	if err != nil {
 		msg := "failed to wait for index creation"
 		logger.Error(msg, slog.Any("error", err))
-
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -285,7 +282,6 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 	if err != nil {
 		msg := "failed to wait for index deletion"
 		logger.Error(msg, slog.Any("error", err))
-
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
