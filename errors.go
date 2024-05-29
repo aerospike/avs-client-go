@@ -22,20 +22,19 @@ func NewAVSErrorFromGrpc(msg string, gErr error) error {
 	}
 
 	if !ok {
-		// Should we instead return
 		return NewAVSError(gErr.Error())
 	}
 
-	errStr := fmt.Sprintf("%s: avs server error: code=%s", msg, status.Code().String())
+	errStr := fmt.Sprintf("%s: server error: %s", msg, status.Code().String())
 	gMsg := status.Message()
 	details := status.Details()
 
 	if gMsg != "" {
-		errStr = fmt.Sprintf(", msg=%s", gMsg)
+		errStr = fmt.Sprintf("%s, msg=%s", errStr, gMsg)
 	}
 
 	if len(details) > 0 {
-		errStr = fmt.Sprintf(", details=%v", details)
+		errStr = fmt.Sprintf("%s, details=%v", errStr, details)
 	}
 
 	return NewAVSError(errStr)

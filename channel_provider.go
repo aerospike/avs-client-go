@@ -2,6 +2,7 @@ package avs
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"strconv"
@@ -33,7 +34,7 @@ type ChannelProvider struct {
 	logger          *slog.Logger
 	nodeConns       map[uint64]*ChannelAndEndpoints
 	seedConns       []*grpc.ClientConn
-	seeds           []*HostPort
+	seeds           HostPortSlice
 	tendLock        *sync.RWMutex
 	tendInterval    int // in seconds
 	clusterID       uint64
@@ -46,7 +47,7 @@ type ChannelProvider struct {
 
 func NewChannelProvider(
 	ctx context.Context,
-	seeds []*HostPort,
+	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
 	logger *slog.Logger,
@@ -55,7 +56,7 @@ func NewChannelProvider(
 		panic("seeds cannot be nil or empty")
 	}
 
-	logger = logger.WithGroup("channel_provider")
+	logger = logger.WithGroup("cp")
 
 	cp := &ChannelProvider{
 		nodeConns:       make(map[uint64]*ChannelAndEndpoints),
@@ -154,10 +155,20 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 
 		go func(seed *HostPort) {
 			defer wg.Done()
+			logger := cp.logger.With(slog.String("host", seed.String()))
 
 			conn, err := createChannel(ctx, seed)
 			if err != nil {
-				cp.logger.Warn("failed to connect to seed", slog.String("address", seed.String()), slog.Any("error", err))
+				logger.ErrorContext(ctx, "failed to create channel", slog.Any("error", err))
+				return
+			}
+
+			client := protos.NewClusterInfoClient(conn)
+
+			_, err = client.GetClusterId(ctx, &emptypb.Empty{})
+			if err != nil {
+				// ctx.Err()
+				logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
 				return
 			}
 
@@ -177,8 +188,19 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	}
 
 	if !success {
-		cp.logger.Error("failed to connect to any seed")
-		return errors.New("failed to connect to any seed")
+		msg := "failed to connect to seeds"
+
+		if err := ctx.Err(); err != nil {
+			var ctxMsg string
+			if err == context.DeadlineExceeded {
+				ctxMsg = "connection timed out"
+			} else {
+				ctxMsg = err.Error()
+			}
+			msg = fmt.Sprintf("%s: %s", msg, ctxMsg)
+		}
+
+		return NewAVSError(msg)
 	}
 
 	return nil
@@ -237,16 +259,17 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 
 		go func(conn *grpc.ClientConn) {
 			defer wg.Done()
+			logger := cp.logger.With(slog.String("host", conn.Target()))
 
 			client := protos.NewClusterInfoClient(conn)
 
 			clusterID, err := client.GetClusterId(context.TODO(), &emptypb.Empty{})
 			if err != nil {
-				cp.logger.Warn("failed to get cluster ID", slog.Any("error", err))
+				logger.Warn("failed to get cluster ID", slog.Any("error", err))
 			}
 
 			if !cp.checkAndSetClusterID(clusterID.GetId()) {
-				cp.logger.Debug("old cluster ID found, skipping channel discovery")
+				logger.Debug("old cluster ID found, skipping channel discovery")
 				return
 			}
 
@@ -254,7 +277,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 
 			endpointsResp, err := client.GetClusterEndpoints(context.Background(), endpointsReq)
 			if err != nil {
-				cp.logger.Error("failed to get cluster endpoints", slog.Any("error", err))
+				logger.Error("failed to get cluster endpoints", slog.Any("error", err))
 				return
 			}
 

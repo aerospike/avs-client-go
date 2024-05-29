@@ -17,12 +17,12 @@ type AdminClient struct {
 
 func NewAdminClient(
 	ctx context.Context,
-	seeds []*HostPort,
+	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
 	logger *slog.Logger,
 ) (*AdminClient, error) {
-	logger = logger.WithGroup("aerospike_vector_search.admin")
+	logger = logger.WithGroup("avs.admin")
 	logger.Debug("creating new client")
 
 	channelProvider, err := NewChannelProvider(ctx, seeds, listenerName, isLoadBalancer, logger)
