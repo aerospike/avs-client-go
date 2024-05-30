@@ -52,6 +52,7 @@ func (c *AdminClient) IndexCreate(
 	vectorDistanceMetric protos.VectorDistanceMetric,
 	indexParams *protos.HnswParams,
 	indexMetaData map[string]string,
+	indexStorage *protos.IndexStorage,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
@@ -82,6 +83,7 @@ func (c *AdminClient) IndexCreate(
 		SetFilter:            set,
 		Params:               &protos.IndexDefinition_HnswParams{HnswParams: indexParams},
 		Labels:               indexMetaData,
+		Storage:              indexStorage,
 	}
 
 	client := protos.NewIndexServiceClient(conn)
