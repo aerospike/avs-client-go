@@ -173,6 +173,7 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 
 		go func(seed *HostPort) {
 			defer wg.Done()
+
 			logger := cp.logger.With(slog.String("host", seed.String()))
 
 			logger := cp.logger.With(slog.String("host", seed.String()))
@@ -274,7 +275,6 @@ func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 
 		go func(conn *grpc.ClientConn) {
 			defer wg.Done()
-			logger := cp.logger.With(slog.String("host", conn.Target()))
 
 			logger := cp.logger.With(slog.String("host", conn.Target()))
 			client := protos.NewClusterInfoClient(conn)
