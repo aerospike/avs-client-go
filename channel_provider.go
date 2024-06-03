@@ -90,7 +90,7 @@ func NewChannelProvider(
 }
 
 func (cp *ChannelProvider) Close() {
-	if cp.isLoadBalancer {
+	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
 		<-cp.tendStoppedChan
 	}
