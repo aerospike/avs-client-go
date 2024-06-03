@@ -137,7 +137,9 @@ func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionLis
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to get indexes"
+
 		c.logger.Error(msg, slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -146,7 +148,9 @@ func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionLis
 	indexList, err := client.List(ctx, nil)
 	if err != nil {
 		msg := "failed to get indexes"
+
 		c.logger.Error(msg, slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -160,6 +164,7 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 	if err != nil {
 		msg := "failed to get index"
 		logger.Error(msg, slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -187,6 +192,7 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	if err != nil {
 		msg := "failed to get index status"
 		logger.Error(msg, slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -218,6 +224,7 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 	if err != nil {
 		msg := "failed to wait for index creation"
 		logger.Error(msg, slog.Any("error", err))
+
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -242,7 +249,9 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 				}
 			} else {
 				msg := "unable to wait for index creation, an unexpected error occurred"
+
 				logger.Error(msg, slog.Any("error", err))
+
 				return NewAVSErrorFromGrpc(msg, err)
 			}
 		} else {
@@ -261,6 +270,7 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 	if err != nil {
 		msg := "failed to wait for index deletion"
 		logger.Error(msg, slog.Any("error", err))
+
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 

@@ -15,7 +15,7 @@ func NewAVSError(msg string) error {
 }
 
 func NewAVSErrorFromGrpc(msg string, gErr error) error {
-	status, ok := status.FromError(gErr)
+	gStatus, ok := status.FromError(gErr)
 
 	if gErr == nil {
 		return nil
@@ -25,9 +25,9 @@ func NewAVSErrorFromGrpc(msg string, gErr error) error {
 		return NewAVSError(gErr.Error())
 	}
 
-	errStr := fmt.Sprintf("%s: server error: %s", msg, status.Code().String())
-	gMsg := status.Message()
-	details := status.Details()
+	errStr := fmt.Sprintf("%s: server error: %s", msg, gStatus.Code().String())
+	gMsg := gStatus.Message()
+	details := gStatus.Details()
 
 	if gMsg != "" {
 		errStr = fmt.Sprintf("%s, msg=%s", errStr, gMsg)
