@@ -80,7 +80,7 @@ func NewChannelProvider(
 	}
 
 	if !isLoadBalancer {
-		cp.updateClusterChannels() // We want at least one tend to occur before we return
+		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
 		go cp.tend()
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
@@ -251,7 +251,7 @@ func (cp *ChannelProvider) getTendConns() []*grpc.ClientConn {
 	return channels
 }
 
-func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpointList {
+func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
 	conns := cp.getTendConns()
 	endpointsChan := make(chan map[uint64]*protos.ServerEndpointList)
 	wg := sync.WaitGroup{}
@@ -265,7 +265,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 			logger := cp.logger.With(slog.String("host", conn.Target()))
 			client := protos.NewClusterInfoClient(conn)
 
-			clusterID, err := client.GetClusterId(context.TODO(), &emptypb.Empty{})
+			clusterID, err := client.GetClusterId(ctx, &emptypb.Empty{})
 			if err != nil {
 				logger.Warn("failed to get cluster ID", slog.Any("error", err))
 			}
@@ -277,7 +277,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints() map[uint64]*protos.ServerEndpoi
 
 			endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
 
-			endpointsResp, err := client.GetClusterEndpoints(context.Background(), endpointsReq)
+			endpointsResp, err := client.GetClusterEndpoints(ctx, endpointsReq)
 			if err != nil {
 				logger.Error("failed to get cluster endpoints", slog.Any("error", err))
 				return
@@ -354,8 +354,8 @@ func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	cp.tendLock.Unlock()
 }
 
-func (cp *ChannelProvider) updateClusterChannels() {
-	updatedEndpoints := cp.getUpdatedEndpoints()
+func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
+	updatedEndpoints := cp.getUpdatedEndpoints(ctx)
 	if updatedEndpoints == nil {
 		cp.logger.Debug("no new cluster ID found, cluster state is unchanged, skipping channel discovery")
 		return
@@ -369,7 +369,7 @@ func (cp *ChannelProvider) tend() {
 	for {
 		select {
 		case <-time.After(time.Duration(cp.tendInterval) * time.Second):
-			cp.updateClusterChannels()
+			cp.updateClusterChannels(context.Background())
 		case <-cp.stopTendChan:
 			cp.tendStoppedChan <- struct{}{}
 			return
