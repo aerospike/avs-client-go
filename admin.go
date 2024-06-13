@@ -2,6 +2,7 @@ package avs
 
 import (
 	"context"
+	"crypto/tls"
 	"log/slog"
 	"time"
 
@@ -25,12 +26,20 @@ func NewAdminClient(
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
+	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*AdminClient, error) {
 	logger = logger.WithGroup("avs.admin")
 	logger.Debug("creating new client")
 
-	channelProvider, err := NewChannelProvider(ctx, seeds, listenerName, isLoadBalancer, logger)
+	channelProvider, err := NewChannelProvider(
+		ctx,
+		seeds,
+		listenerName,
+		isLoadBalancer,
+		tlsConfig,
+		logger,
+	)
 	if err != nil {
 		logger.Error("failed to create channel provider", slog.Any("error", err))
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)

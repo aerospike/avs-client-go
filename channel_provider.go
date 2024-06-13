@@ -1,6 +1,7 @@
 package avs
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/aerospike/aerospike-proximus-client-go/protos"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -49,6 +51,7 @@ func NewChannelProvider(
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
+	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*ChannelProvider, error) {
 	if len(seeds) == 0 {
@@ -176,7 +179,7 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 
 			logger := cp.logger.With(slog.String("host", seed.String()))
 
-			conn, err := createChannel(ctx, seed)
+			conn, err := createChannel(ctx, seed, cp.tlsConfig)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create channel", slog.Any("error", err))
 				return
@@ -477,7 +480,15 @@ func createChannelFromEndpoints(
 	return nil, errors.New("no valid endpoint found")
 }
 
-func createChannel(ctx context.Context, hostPort *HostPort) (*grpc.ClientConn, error) {
+func createChannel(ctx context.Context, hostPort *HostPort, tlsConfig *tls.Config) (*grpc.ClientConn, error) {
+	opts := []grpc.DialOption{}
+
+	if tlsConfig == nil {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	}
+
 	conn, err := grpc.DialContext(
 		ctx,
 		hostPort.toDialString(),
