@@ -160,7 +160,6 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) != 0 {
 		msg := "seed channels already exist, close them first"
 		cp.logger.Error(msg)
-
 		return errors.New(msg)
 	}
 
