@@ -36,6 +36,7 @@ type ChannelProvider struct {
 	logger         *slog.Logger
 	nodeConns      map[uint64]*ChannelAndEndpoints
 	seedConns      []*grpc.ClientConn
+	tlsConfig      *tls.Config
 	seeds          HostPortSlice
 	nodeConnsLock  *sync.RWMutex
 	tendInterval   time.Duration
@@ -65,6 +66,7 @@ func NewChannelProvider(
 		seeds:          seeds,
 		listenerName:   listenerName,
 		isLoadBalancer: isLoadBalancer,
+		tlsConfig:      tlsConfig,
 		tendInterval:   time.Second * 1,
 		nodeConnsLock:  &sync.RWMutex{},
 		stopTendChan:   make(chan struct{}),
@@ -78,6 +80,7 @@ func NewChannelProvider(
 	}
 
 	if !isLoadBalancer {
+		cp.logger.Debug("starting tend routine")
 		cp.updateClusterChannels(ctx)    // We want at least one tend to occur before we return
 		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
 	} else {
@@ -179,7 +182,7 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 
 			logger := cp.logger.With(slog.String("host", seed.String()))
 
-			conn, err := createChannel(ctx, seed, cp.tlsConfig)
+			conn, err := cp.createChannel(seed)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create channel", slog.Any("error", err))
 				return
@@ -220,11 +223,10 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 }
 
 func (cp *ChannelProvider) updateNodeConns(
-	ctx context.Context,
 	node uint64,
 	endpoints *protos.ServerEndpointList,
 ) error {
-	newChannel, err := createChannelFromEndpoints(ctx, endpoints)
+	newChannel, err := cp.createChannelFromEndpoints(endpoints)
 	if err != nil {
 		return err
 	}
@@ -345,11 +347,13 @@ func (cp *ChannelProvider) checkAndSetNodeConns(
 					}
 
 					// Either this is a new node or its endpoints have changed
-					err = cp.updateNodeConns(ctx, node, newEndpoints)
+					err = cp.updateNodeConns(node, newEndpoints)
 					if err != nil {
 						logger.Error("failed to create new channel", slog.Any("error", err))
 					}
 				}
+			} else {
+				cp.logger.Debug("endpoints for node unchanged", slog.Uint64("node", node))
 			}
 		}(node, newEndpoints)
 	}
@@ -381,6 +385,8 @@ func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
 		return
 	}
 
+	cp.logger.Debug("new endpoints found, updating channels", slog.Any("endpoints", updatedEndpoints))
+
 	cp.checkAndSetNodeConns(ctx, updatedEndpoints)
 	cp.removeDownNodes(updatedEndpoints)
 }
@@ -394,6 +400,8 @@ func (cp *ChannelProvider) tend(ctx context.Context) {
 
 		select {
 		case <-timer.C:
+			cp.logger.Debug("tending . . .")
+
 			ctx, cancel := context.WithTimeout(ctx, cp.tendInterval) // TODO: make configurable?
 
 			cp.updateClusterChannels(ctx)
@@ -401,6 +409,8 @@ func (cp *ChannelProvider) tend(ctx context.Context) {
 			if err := ctx.Err(); err != nil {
 				cp.logger.Warn("tend context cancelled", slog.Any("error", err))
 			}
+
+			cp.logger.Debug("finished tend")
 
 			cancel()
 		case <-cp.stopTendChan:
@@ -453,24 +463,15 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 	return NewHostPort(endpoint.Address, int(endpoint.Port), endpoint.IsTls)
 }
 
-func createChannelFromEndpoints(
-	ctx context.Context,
+func (cp *ChannelProvider) createChannelFromEndpoints(
 	endpoints *protos.ServerEndpointList,
 ) (*grpc.ClientConn, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	for _, endpoint := range endpoints.Endpoints {
 		if strings.ContainsRune(endpoint.Address, ':') {
 			continue // TODO: Add logging and support for IPv6
 		}
 
-		conn, err := grpc.DialContext(
-			ctx,
-			endpointToHostPort(endpoint).toDialString(),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
+		conn, err := cp.createChannel(endpointToHostPort(endpoint))
 
 		if err == nil {
 			return conn, nil
@@ -480,19 +481,20 @@ func createChannelFromEndpoints(
 	return nil, errors.New("no valid endpoint found")
 }
 
-func createChannel(ctx context.Context, hostPort *HostPort, tlsConfig *tls.Config) (*grpc.ClientConn, error) {
+func (cp *ChannelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 
-	if tlsConfig == nil {
+	if cp.tlsConfig == nil {
+		cp.logger.Debug("using insecure connection to host", slog.String("host", hostPort.String()))
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+		cp.logger.Debug("using secure tls connection to host", slog.String("host", hostPort.String()))
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(cp.tlsConfig)))
 	}
 
-	conn, err := grpc.DialContext(
-		ctx,
+	conn, err := grpc.NewClient(
 		hostPort.toDialString(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		opts...,
 	)
 	if err != nil {
 		return nil, err

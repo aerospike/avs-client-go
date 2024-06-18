@@ -82,10 +82,13 @@ func (c *AdminClient) IndexCreate(
 
 	if len(sets) > 0 {
 		set = &sets[0]
-		logger.Warn(
-			"multiple sets not yet supported for index creation, only the first set will be used",
-			slog.String("set", *set),
-		)
+
+		if len(sets) > 1 {
+			logger.Warn(
+				"multiple sets not yet supported for index creation, only the first set will be used",
+				slog.String("set", *set),
+			)
+		}
 	}
 
 	indexDef := &protos.IndexDefinition{
