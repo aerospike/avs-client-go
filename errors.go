@@ -15,12 +15,11 @@ func NewAVSError(msg string) error {
 }
 
 func NewAVSErrorFromGrpc(msg string, gErr error) error {
-	gStatus, ok := status.FromError(gErr)
-
 	if gErr == nil {
 		return nil
 	}
 
+	gStatus, ok := status.FromError(gErr)
 	if !ok {
 		return NewAVSError(gErr.Error())
 	}

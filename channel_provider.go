@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,18 +30,17 @@ func NewChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEn
 
 //nolint:govet // We will favor readability over field alignment
 type ChannelProvider struct {
-	logger          *slog.Logger
-	nodeConns       map[uint64]*ChannelAndEndpoints
-	seedConns       []*grpc.ClientConn
-	seeds           HostPortSlice
-	tendLock        *sync.RWMutex
-	tendInterval    int // in seconds
-	clusterID       uint64
-	listenerName    *string
-	isLoadBalancer  bool
-	stopTendChan    chan struct{}
-	tendStoppedChan chan struct{}
-	closed          bool
+	logger         *slog.Logger
+	nodeConns      map[uint64]*ChannelAndEndpoints
+	seedConns      []*grpc.ClientConn
+	seeds          HostPortSlice
+	tendLock       *sync.RWMutex
+	tendInterval   time.Duration
+	clusterID      uint64
+	listenerName   *string
+	isLoadBalancer bool
+	stopTendChan   chan struct{}
+	closed         bool
 }
 
 func NewChannelProvider(
@@ -53,24 +51,20 @@ func NewChannelProvider(
 	logger *slog.Logger,
 ) (*ChannelProvider, error) {
 	if len(seeds) == 0 {
-		panic("seeds cannot be nil or empty")
+		return nil, fmt.Errorf("seeds cannot be nil or empty")
 	}
 
 	logger = logger.WithGroup("cp")
 
 	cp := &ChannelProvider{
-		nodeConns:       make(map[uint64]*ChannelAndEndpoints),
-		seedConns:       nil,
-		closed:          false,
-		clusterID:       0,
-		seeds:           seeds,
-		listenerName:    listenerName,
-		isLoadBalancer:  isLoadBalancer,
-		tendInterval:    1,
-		tendLock:        &sync.RWMutex{},
-		stopTendChan:    make(chan struct{}),
-		tendStoppedChan: make(chan struct{}),
-		logger:          logger,
+		nodeConns:      make(map[uint64]*ChannelAndEndpoints),
+		seeds:          seeds,
+		listenerName:   listenerName,
+		isLoadBalancer: isLoadBalancer,
+		tendInterval:   time.Second * 1,
+		tendLock:       &sync.RWMutex{},
+		stopTendChan:   make(chan struct{}),
+		logger:         logger,
 	}
 
 	err := cp.connectToSeeds(ctx)
@@ -80,8 +74,8 @@ func NewChannelProvider(
 	}
 
 	if !isLoadBalancer {
-		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
-		go cp.tend()
+		cp.updateClusterChannels(ctx)    // We want at least one tend to occur before we return
+		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
 	}
@@ -89,22 +83,40 @@ func NewChannelProvider(
 	return cp, nil
 }
 
-func (cp *ChannelProvider) Close() {
+func (cp *ChannelProvider) Close() error {
 	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
-		<-cp.tendStoppedChan
+		<-cp.stopTendChan
 	}
 
+	var firstErr error
+
 	for _, channel := range cp.seedConns {
-		channel.Close()
+		err := channel.Close()
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+
+			cp.logger.Error("failed to close seed channel", slog.Any("error", err), slog.String("seed", channel.Target()))
+		}
 	}
 
 	for _, channel := range cp.nodeConns {
-		channel.Channel.Close()
+		err := channel.Channel.Close()
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+
+			cp.logger.Error("failed to close node channel", slog.Any("error", err), slog.String("node", channel.Channel.Target()))
+		}
 	}
 
 	cp.logger.Debug("closed")
 	cp.closed = true
+
+	return firstErr
 }
 
 func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
@@ -122,11 +134,9 @@ func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
 	defer cp.tendLock.RUnlock()
 
 	discoverdChannels := make([]*ChannelAndEndpoints, len(cp.nodeConns))
-	i := 0
 
-	for _, channel := range cp.nodeConns {
+	for i, channel := range cp.nodeConns {
 		discoverdChannels[i] = channel
-		i++
 	}
 
 	if len(discoverdChannels) == 0 {
@@ -141,11 +151,11 @@ func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
 
 func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) != 0 {
-		cp.logger.Error("seed channels already exist, close them first")
-		return errors.New("seed channels already exist, close them first")
+		msg := "seed channels already exist, close them first"
+		cp.logger.Error(msg)
+		return errors.New(msg)
 	}
 
-	success := false
 	wg := sync.WaitGroup{}
 	seedCons := make(chan *grpc.ClientConn)
 	cp.seedConns = []*grpc.ClientConn{}
@@ -168,7 +178,6 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 
 			_, err = client.GetClusterId(ctx, &emptypb.Empty{})
 			if err != nil {
-				// ctx.Err()
 				logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
 				return
 			}
@@ -183,23 +192,14 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	}()
 
 	for conn := range seedCons {
-		success = true
-
 		cp.seedConns = append(cp.seedConns, conn)
 	}
 
-	if !success {
+	if len(cp.seedConns) == 0 {
 		msg := "failed to connect to seeds"
 
 		if err := ctx.Err(); err != nil {
-			var ctxMsg string
-			if err == context.DeadlineExceeded {
-				ctxMsg = "connection timed out"
-			} else {
-				ctxMsg = err.Error()
-			}
-
-			msg = fmt.Sprintf("%s: %s", msg, ctxMsg)
+			msg = fmt.Sprintf("%s: %s", msg, err.Error())
 		}
 
 		return NewAVSError(msg)
@@ -254,6 +254,7 @@ func (cp *ChannelProvider) getTendConns() []*grpc.ClientConn {
 func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
 	conns := cp.getTendConns()
 	endpointsChan := make(chan map[uint64]*protos.ServerEndpointList)
+	endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
 	wg := sync.WaitGroup{}
 
 	for _, conn := range conns {
@@ -274,8 +275,6 @@ func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 				logger.Debug("old cluster ID found, skipping channel discovery")
 				return
 			}
-
-			endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
 
 			endpointsResp, err := client.GetClusterEndpoints(ctx, endpointsReq)
 			if err != nil {
@@ -303,7 +302,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 	return maxTempEndpoints
 }
 
-func (cp *ChannelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
+func (cp *ChannelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	wg := sync.WaitGroup{}
 
 	// Find which nodes have a different endpoint list and update their channel
@@ -313,25 +312,17 @@ func (cp *ChannelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 		go func(node uint64, newEndpoints *protos.ServerEndpointList) {
 			defer wg.Done()
 
-			addNewConn := true
-
 			if currEndpoints, ok := cp.nodeConns[node]; ok {
-				if endpointListEqual(currEndpoints.Endpoints, newEndpoints) {
-					addNewConn = false
-				} else {
+				if !endpointListEqual(currEndpoints.Endpoints, newEndpoints) {
 					cp.logger.Debug("endpoints for node changed, recreating channel", slog.Uint64("node", node))
 
-					addNewConn = true
-
 					currEndpoints.Channel.Close()
-				}
-			}
 
-			if addNewConn {
-				// Either this is a new node or its endpoints have changed
-				err := cp.updateNodeConns(context.TODO(), node, newEndpoints)
-				if err != nil {
-					cp.logger.Error("failed to create new channel", slog.Uint64("node", node), slog.Any("error", err))
+					// Either this is a new node or its endpoints have changed
+					err := cp.updateNodeConns(ctx, node, newEndpoints)
+					if err != nil {
+						cp.logger.Error("failed to create new channel", slog.Uint64("node", node), slog.Any("error", err))
+					}
 				}
 			}
 		}(node, newEndpoints)
@@ -342,6 +333,7 @@ func (cp *ChannelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 
 func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	cp.tendLock.Lock()
+	defer cp.tendLock.Unlock()
 
 	// The cluster state changed. Remove old channels.
 	for node, channelEndpoints := range cp.nodeConns {
@@ -350,8 +342,6 @@ func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 			delete(cp.nodeConns, node)
 		}
 	}
-
-	cp.tendLock.Unlock()
 }
 
 func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
@@ -361,17 +351,33 @@ func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
 		return
 	}
 
-	cp.checkAndSetNodeConns(updatedEndpoints)
+	cp.checkAndSetNodeConns(ctx, updatedEndpoints)
 	cp.removeDownNodes(updatedEndpoints)
 }
 
-func (cp *ChannelProvider) tend() {
+func (cp *ChannelProvider) tend(ctx context.Context) {
+	timer := time.NewTimer(cp.tendInterval)
+
 	for {
+		timer.Reset(cp.tendInterval)
+
 		select {
-		case <-time.After(time.Duration(cp.tendInterval) * time.Second):
-			cp.updateClusterChannels(context.Background())
+		case <-timer.C:
+			ctx, cancel := context.WithTimeout(ctx, cp.tendInterval) // TODO: make configurable?
+
+			cp.updateClusterChannels(ctx)
+
+			if err := ctx.Err(); err != nil {
+				cp.logger.Warn("tend context cancelled", slog.Any("error", err))
+			}
+
+			cancel()
 		case <-cp.stopTendChan:
-			cp.tendStoppedChan <- struct{}{}
+			if !timer.Stop() {
+				<-timer.C
+			}
+
+			cp.stopTendChan <- struct{}{}
 			return
 		}
 	}
@@ -414,7 +420,7 @@ func createChannelFromEndpoints(
 
 		conn, err := grpc.DialContext(
 			ctx,
-			hostPortToDialString(endpointToHostPort(endpoint)),
+			endpointToHostPort(endpoint).toDialString(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
 
@@ -429,7 +435,7 @@ func createChannelFromEndpoints(
 func createChannel(ctx context.Context, hostPort *HostPort) (*grpc.ClientConn, error) {
 	conn, err := grpc.DialContext(
 		ctx,
-		hostPortToDialString(hostPort),
+		hostPort.toDialString(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -437,8 +443,4 @@ func createChannel(ctx context.Context, hostPort *HostPort) (*grpc.ClientConn, e
 	}
 
 	return conn, nil
-}
-
-func hostPortToDialString(hostPort *HostPort) string {
-	return hostPort.Host + ":" + strconv.Itoa(hostPort.Port)
 }

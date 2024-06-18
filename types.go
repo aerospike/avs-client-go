@@ -21,7 +21,11 @@ func NewHostPort(host string, port int, isTLS bool) *HostPort {
 }
 
 func (hp *HostPort) String() string {
-	return hp.Host + ":" + fmt.Sprintf("%d", hp.Port)
+	return hp.toDialString()
+}
+
+func (hp *HostPort) toDialString() string {
+	return fmt.Sprintf("%s:%d", hp.Host, hp.Port)
 }
 
 type HostPortSlice []*HostPort

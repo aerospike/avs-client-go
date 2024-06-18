@@ -23,7 +23,7 @@ func NewClient(
 	isLoadBalancer bool,
 	logger *slog.Logger,
 ) *Client {
-	logger = logger.WithGroup("aerospike_vector_search")
+	logger = logger.WithGroup("avs.client")
 
 	return &Client{
 		seeds:          seeds,
@@ -37,14 +37,14 @@ func NewClient(
 func (c *Client) Get(ctx context.Context,
 	namespace,
 	setName string,
-	key interface{},
+	key any,
 	binNames []string,
 ) (*protos.Record, error) {
 	return nil, ErrNotImplemented
 }
 
 //nolint:revive // TODO
-func (c *Client) Delete(ctx context.Context, namespace, setName string, key interface{}) (*protos.Record, error) {
+func (c *Client) Delete(ctx context.Context, namespace, setName string, key any) (*protos.Record, error) {
 	return nil, ErrNotImplemented
 }
 
@@ -53,13 +53,13 @@ func (c *Client) Exists(
 	ctx context.Context,
 	namespace,
 	setName string,
-	key interface{},
+	key any,
 ) (bool, error) {
 	return false, ErrNotImplemented
 }
 
 //nolint:revive // TODO
-func (c *Client) IsIndexed(ctx context.Context, namespace, setName, indexName string, key interface{}) (bool, error) {
+func (c *Client) IsIndexed(ctx context.Context, namespace, setName, indexName string, key any) (bool, error) {
 	return false, ErrNotImplemented
 }
 

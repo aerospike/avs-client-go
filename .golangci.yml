@@ -71,13 +71,13 @@ run:
 
 # issues:
 #   exclude-rules:
-#     - path: info/as_parser_test\.go
+#     - path: dir/sample\.go
 #       linters:
 #       - lll # Test code is allowed to have long lines
-#     - path: asconfig/generate_test\.go
+#     - path: dir/sample\.go
 #       linters:
 #       - dupl # Test code is allowed to have duplicate code
-#     - path: asconfig/asconfig_test\.go
+#     - path: dir/sample\.go
 #       linters:
 #       - dupl # Test code is allowed to have duplicate code
 #     - path: '(.+)test\.go'
