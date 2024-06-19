@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aerospike/aerospike-proximus-client-go/protos"
+	"github.com/aerospike/avs-client-go/protos"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

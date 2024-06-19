@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/aerospike/aerospike-proximus-client-go/protos"
+	"github.com/aerospike/avs-client-go/protos"
 )
 
 //nolint:govet // We will favor readability over field alignment

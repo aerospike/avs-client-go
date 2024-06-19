@@ -1,4 +1,4 @@
-module github.com/aerospike/aerospike-proximus-client-go
+module github.com/aerospike/avs-client-go
 
 go 1.21
 

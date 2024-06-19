@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/aerospike/aerospike-proximus-client-go/protos"
+	"github.com/aerospike/avs-client-go/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
