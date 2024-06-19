@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -338,7 +339,11 @@ func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	// The cluster state changed. Remove old channels.
 	for node, channelEndpoints := range cp.nodeConns {
 		if _, ok := newNodeEndpoints[node]; !ok {
-			channelEndpoints.Channel.Close()
+			err := channelEndpoints.Channel.Close()
+			if err != nil {
+				cp.logger.Warn("failed to close channel", slog.Uint64("node", node), slog.Any("error", err))
+			}
+
 			delete(cp.nodeConns, node)
 		}
 	}
@@ -392,8 +397,29 @@ func endpointListEqual(a, b *protos.ServerEndpointList) bool {
 		return false
 	}
 
-	for i, endpoint := range a.Endpoints {
-		if !endpointEqual(endpoint, b.Endpoints[i]) {
+	aEndpoints := make([]*protos.ServerEndpoint, len(a.Endpoints))
+	copy(aEndpoints, a.Endpoints)
+
+	bEndpoints := make([]*protos.ServerEndpoint, len(b.Endpoints))
+	copy(bEndpoints, b.Endpoints)
+
+	sortFunc := func(endpoints []*protos.ServerEndpoint) func(int, int) bool {
+		return func(i, j int) bool {
+			if endpoints[i].Address < endpoints[j].Address {
+				return true
+			} else if endpoints[i].Address > endpoints[j].Address {
+				return false
+			}
+
+			return endpoints[i].Port < endpoints[j].Port
+		}
+	}
+
+	sort.Slice(aEndpoints, sortFunc(aEndpoints))
+	sort.Slice(bEndpoints, sortFunc(bEndpoints))
+
+	for i, endpoint := range aEndpoints {
+		if !endpointEqual(endpoint, bEndpoints[i]) {
 			return false
 		}
 	}
