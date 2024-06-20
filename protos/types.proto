@@ -1,0 +1,258 @@
+syntax = "proto3";
+
+package aerospike.vector;
+
+option go_package = "aerospike.com/vector/protos/";
+option java_package = "com.aerospike.vector.client";
+option java_multiple_files = true;
+
+// A record key.
+message Key {
+  // The storage namespace.
+  string namespace = 1;
+
+  // Optional storage set.
+  optional string set = 2;
+
+  // The key value.
+  oneof value {
+    string stringValue = 3;
+
+    bytes bytesValue = 4;
+
+    int32 intValue = 5;
+
+    int64 longValue = 6;
+  }
+}
+
+message BoolData {
+  repeated bool value = 1;
+}
+
+message FloatData {
+  repeated float value = 1;
+}
+
+message MapKey {
+  oneof value {
+    string stringValue = 1;
+
+    bytes bytesValue = 2;
+
+    int32 intValue = 3;
+
+    int64 longValue = 4;
+
+    float  floatValue = 5;
+
+    double doubleValue = 6;
+  }
+}
+
+message MapEntry {
+  MapKey key = 1;
+  Value value = 2;
+}
+
+message Map {
+  repeated MapEntry entries = 1;
+}
+
+message List {
+  repeated Value entries = 1;
+}
+
+// A vector.
+message Vector {
+  // Vector data
+  oneof data {
+    BoolData boolData = 1;
+    FloatData floatData = 2;
+  }
+}
+
+// A data value.
+message Value {
+  oneof value {
+    string stringValue = 1;
+
+    bytes bytesValue = 2;
+
+    int32 intValue = 3;
+
+    int64 longValue = 4;
+
+    float  floatValue = 5;
+
+    double doubleValue = 6;
+
+    Map mapValue = 7;
+
+    List listValue = 8;
+
+    Vector vectorValue = 9;
+
+    bool booleanValue = 10;
+  }
+}
+
+// A field in the record.
+message Field {
+  string name = 1;
+  Value value = 2;
+}
+
+message AerospikeRecordMetadata {
+  // Record modification count.
+  uint32 generation = 1;
+
+  // Date record will expire, in seconds from Jan 01 2010 00:00:00 GMT.
+  uint32 expiration = 2;
+}
+
+// A single database record.
+message Record {
+  // Record fields.
+  repeated Field fields = 1;
+
+  // Record metadata.
+  oneof metadata {
+    AerospikeRecordMetadata aerospikeMetadata = 2;
+  }
+}
+
+// TODO: For simplicity , include key in Record?
+message Neighbor {
+  // The result record key.
+  Key key = 1;
+
+  // The result record, will be missing if no record corresponding to the key is
+  // found.
+  optional Record record = 2;
+
+  // The distance from the query vector.
+  float distance = 3;
+}
+
+// Unique identifier for an index.
+message IndexId {
+  // The index namespace.
+  string namespace = 1;
+
+  // The name of the index. This should be unique within the namespace.
+  string name = 2;
+}
+
+enum VectorDistanceMetric {
+  SQUARED_EUCLIDEAN = 0;
+  COSINE = 1;
+  DOT_PRODUCT = 2;
+  MANHATTAN = 3;
+  HAMMING = 4;
+}
+
+enum IndexType {
+  HNSW = 0;
+}
+
+// Params for the HNSW index
+message HnswParams {
+  // Maximum number bi-directional links per HNSW vertex. Greater values of
+  // 'm' in general provide better recall for data with high dimensionality, while
+  // lower values work well for data with lower dimensionality.
+  // The storage space required for the index increases proportionally with 'm'.
+  // The default value is 16.
+  optional uint32 m = 1;
+
+  // The number of candidate nearest neighbors shortlisted during index creation.
+  // Larger values provide better recall at the cost of longer index update times.
+  // The default is 100.
+  optional uint32 efConstruction = 2;
+
+  // The default number of candidate nearest neighbors shortlisted during search.
+  // Larger values provide better recall at the cost of longer search times.
+  // The default is 100.
+  optional uint32 ef = 3;
+
+  // Configures batching behaviour for batch based index update.
+  HnswBatchingParams batchingParams = 4;
+}
+
+// Params for the HNSW index search
+message HnswSearchParams {
+  // The default number of candidate nearest neighbors shortlisted during search.
+  // Larger values provide better recall at the cost of longer search times.
+  // The default is value set in HnswParams for the index.
+  optional uint32 ef = 1;
+}
+
+// Configures batching behaviour for batch based index update.
+message HnswBatchingParams {
+  // Maximum number of records to fit in a batch.
+  // The default value is 10000.
+  optional uint32 maxRecords = 1;
+
+  // The maximum amount of time in milliseconds to wait before finalizing a batch.
+  // The default value is 10000.
+  optional uint32 interval = 2;
+
+  // Disables batching for index updates.
+  // Default is false meaning batching is enabled.
+  optional bool disabled = 3;
+}
+
+// Index storage configuration
+message IndexStorage {
+  // Optional storage namespace where the index is stored.
+  // Defaults to the index namespace.
+  optional string namespace = 1;
+
+  // Optional storage set where the index is stored.
+  // Defaults to the index name.
+  optional string set = 2;
+}
+
+// An index definition.
+message IndexDefinition {
+  // The index identifier.
+  IndexId id = 1;
+
+  // The type of index.
+  IndexType type = 2;
+
+  // Number of dimensions in data.
+  // Vectors not matching the dimension count will not be indexed.
+  uint32 dimensions = 3;
+
+  // Optional The distance metric to use. Defaults to SQUARED_EUCLIDEAN
+  VectorDistanceMetric vectorDistanceMetric = 4;
+
+  // Name of the record vector field to index.
+  string field = 5;
+
+  // Optional filter on Aerospike set name from which records will be indexed.
+  // If not specified all sets in the index namespace will be indexed.
+  optional string setFilter = 6;
+
+  // Index parameters.
+  oneof params {
+    HnswParams hnswParams = 7;
+  }
+
+  // Optional labels associated with the index.
+  map<string, string> labels = 8;
+
+  // Index storage.
+  optional IndexStorage storage = 9;
+}
+
+// List of index definitions.
+message IndexDefinitionList {
+  repeated IndexDefinition indices = 1;
+}
+
+// A boolean type
+message Boolean {
+  bool value = 1;
+}

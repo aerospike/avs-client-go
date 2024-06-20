@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package aerospike.vector;
+
+option go_package = "aerospike.com/vector/protos/";
+option java_package = "com.aerospike.vector.client";
+option java_multiple_files = true;
+
+import "google/protobuf/empty.proto";
+
+// The about request message.
+message AboutRequest {
+  // Empty for now.
+}
+
+// The about response message.
+message AboutResponse {
+  // Proximus server version.
+  string version = 1;
+}
+
+// Cluster Id
+message ClusterId {
+  uint64 id = 1;
+}
+
+// A server node Id
+message NodeId {
+  uint64 id = 1;
+}
+
+// Server endpoint.
+message ServerEndpoint {
+  // IP address or DNS name.
+  string address = 1;
+
+  // Listening port.
+  uint32 port = 2;
+
+  // Indicates if this is a TLS enabled port.
+  bool isTls = 3;
+}
+
+// Server endpoint.
+message ServerEndpointList {
+  // List of server endpoints.
+  repeated ServerEndpoint endpoints = 1;
+}
+
+// Cluster endpoint.
+message ClusterNodeEndpoints {
+  map<uint64, ServerEndpointList> endpoints = 1;
+}
+
+// Cluster endpoint.
+message ClusterNodeEndpointsRequest {
+  // Optional name of the listener.
+  // If not specified the "default" listener endpoints are returned.
+  optional string listenerName = 1;
+}
+
+message OwnedPartitions {
+  repeated uint64 ownedPartitions = 1;
+}
+
+// Cluster partition ownership.
+message ClusterPartitions {
+  // A map from node-ids to owned partition list.
+  map<uint64, OwnedPartitions> partitions = 1;
+}
+
+// Information about the service.
+service About {
+  rpc Get (AboutRequest) returns (AboutResponse) {}
+}
+
+// Vector DB cluster service.
+service ClusterInfo {
+  // Get the internal cluster node-Id for this server.
+  rpc GetNodeId(google.protobuf.Empty) returns (NodeId) {}
+
+  // Get current cluster-Id for the current cluster.
+  rpc GetClusterId(google.protobuf.Empty) returns (ClusterId) {}
+
+  // Get the advertised/listening endpoints for all nodes in the cluster, given a listener name.
+  rpc GetClusterEndpoints(ClusterNodeEndpointsRequest) returns(ClusterNodeEndpoints) {}
+
+  // Get per-node owned partition list for all nodes in the cluster.
+  rpc GetOwnedPartitions(google.protobuf.Empty) returns(ClusterPartitions) {}
+}

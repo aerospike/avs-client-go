@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package aerospike.vector;
+
+option go_package = "aerospike.com/vector/protos/";
+option java_package = "com.aerospike.vector.client";
+option java_multiple_files = true;
+
+import "google/protobuf/empty.proto";
+import "types.proto";
+
+// The type of write operation.
+enum WriteType {
+  // Insert the record if it does not exist.
+  // Update the record by replacing specified fields.
+  UPSERT = 0;
+
+  // If the record exists update the record by replacing specified fields.
+  // Fails if the record does not exist.
+  UPDATE_ONLY = 1;
+
+  // Insert / create the record if it does not exists.
+  // Fails if the record already exist.
+  INSERT_ONLY = 2;
+}
+
+// Put request to insert/update a record.
+message PutRequest {
+  // The key for the record to insert/update
+  Key key = 1;
+
+  // The type of the put/write request.
+  WriteType writeType = 2;
+
+  // The record fields.
+  repeated Field fields = 3;
+}
+
+// Get request to insert/update a record.
+message GetRequest {
+  // The key for the record to insert/update
+  Key key = 1;
+
+  // The field selector.
+  ProjectionSpec projectionSpec = 2;
+}
+
+// Check if a record exists.
+message ExistsRequest {
+  // The key for the record check
+  Key key = 1;
+}
+
+// Delete request to delete a record.
+message DeleteRequest {
+  // The key for the record to delete
+  Key key = 1;
+}
+
+// Request to check whether the given record is indexed for the specified
+// index.
+message IsIndexedRequest {
+  // The key of the aerospike record holding Vector.
+  Key key = 1;
+
+  // Index in which the vector is indexed.
+  IndexId indexId = 2;
+}
+
+// The type of projection.
+enum ProjectionType {
+  ALL = 0;
+  NONE = 1;
+  SPECIFIED = 2;
+}
+
+// A projection filter.
+message ProjectionFilter {
+  // The type of the selector.
+  ProjectionType type = 1;
+
+  // Names of desired fields / selectors.
+  repeated string fields = 2;
+}
+
+// Projection to select which fields are returned.
+message ProjectionSpec {
+  // The fields to include.
+  ProjectionFilter include = 1;
+
+  // The fields to exclude.
+  ProjectionFilter exclude = 2;
+}
+
+message VectorSearchRequest {
+  // The index identifier.
+  IndexId index = 1;
+
+  // The query vector.
+  Vector queryVector = 2;
+
+  // Maximum number of results to return.
+  uint32 limit = 3;
+
+  // Projection to select fields.
+  ProjectionSpec projection = 4;
+
+  // Optional parameters to tune the search.
+  oneof searchParams {
+    HnswSearchParams hnswSearchParams = 5;
+  }
+}
+
+// Record transaction services.
+service Transact {
+  rpc Put(PutRequest) returns (google.protobuf.Empty) {}
+
+  rpc Get(GetRequest) returns (Record) {}
+
+  rpc Delete(DeleteRequest) returns (google.protobuf.Empty) {}
+
+  rpc Exists(ExistsRequest) returns (Boolean) {}
+
+  rpc IsIndexed(IsIndexedRequest) returns (Boolean) {}
+
+  rpc VectorSearch(VectorSearchRequest) returns (stream Neighbor) {}
+}
