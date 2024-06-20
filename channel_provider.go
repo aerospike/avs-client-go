@@ -35,7 +35,7 @@ type ChannelProvider struct {
 	nodeConns      map[uint64]*ChannelAndEndpoints
 	seedConns      []*grpc.ClientConn
 	seeds          HostPortSlice
-	tendLock       *sync.RWMutex
+	nodeConnsLock  *sync.RWMutex
 	tendInterval   time.Duration
 	clusterID      uint64
 	listenerName   *string
@@ -63,7 +63,7 @@ func NewChannelProvider(
 		listenerName:   listenerName,
 		isLoadBalancer: isLoadBalancer,
 		tendInterval:   time.Second * 1,
-		tendLock:       &sync.RWMutex{},
+		nodeConnsLock:  &sync.RWMutex{},
 		stopTendChan:   make(chan struct{}),
 		logger:         logger,
 	}
@@ -99,7 +99,10 @@ func (cp *ChannelProvider) Close() error {
 				firstErr = err
 			}
 
-			cp.logger.Error("failed to close seed channel", slog.Any("error", err), slog.String("seed", channel.Target()))
+			cp.logger.Error("failed to close seed channel",
+				slog.Any("error", err),
+				slog.String("seed", channel.Target()),
+			)
 		}
 	}
 
@@ -110,7 +113,10 @@ func (cp *ChannelProvider) Close() error {
 				firstErr = err
 			}
 
-			cp.logger.Error("failed to close node channel", slog.Any("error", err), slog.String("node", channel.Channel.Target()))
+			cp.logger.Error("failed to close node channel",
+				slog.Any("error", err),
+				slog.String("node", channel.Channel.Target()),
+			)
 		}
 	}
 
@@ -131,8 +137,8 @@ func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
 		return cp.seedConns[0], nil
 	}
 
-	cp.tendLock.RLock()
-	defer cp.tendLock.RUnlock()
+	cp.nodeConnsLock.RLock()
+	defer cp.nodeConnsLock.RUnlock()
 
 	discoverdChannels := make([]*ChannelAndEndpoints, len(cp.nodeConns))
 
@@ -219,9 +225,9 @@ func (cp *ChannelProvider) updateNodeConns(
 		return err
 	}
 
-	cp.tendLock.Lock()
+	cp.nodeConnsLock.Lock()
 	cp.nodeConns[node] = NewChannelAndEndpoints(newChannel, endpoints)
-	cp.tendLock.Unlock()
+	cp.nodeConnsLock.Unlock()
 
 	return nil
 }
@@ -236,6 +242,9 @@ func (cp *ChannelProvider) checkAndSetClusterID(clusterID uint64) bool {
 }
 
 func (cp *ChannelProvider) getTendConns() []*grpc.ClientConn {
+	cp.nodeConnsLock.RLock()
+	defer cp.nodeConnsLock.RUnlock()
+
 	channels := make([]*grpc.ClientConn, len(cp.seedConns)+len(cp.nodeConns))
 	i := 0
 
@@ -303,7 +312,10 @@ func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 	return maxTempEndpoints
 }
 
-func (cp *ChannelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
+func (cp *ChannelProvider) checkAndSetNodeConns(
+	ctx context.Context,
+	newNodeEndpoints map[uint64]*protos.ServerEndpointList,
+) {
 	wg := sync.WaitGroup{}
 
 	// Find which nodes have a different endpoint list and update their channel
@@ -312,17 +324,25 @@ func (cp *ChannelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndp
 
 		go func(node uint64, newEndpoints *protos.ServerEndpointList) {
 			defer wg.Done()
+			logger := cp.logger.With(slog.Uint64("node", node))
 
-			if currEndpoints, ok := cp.nodeConns[node]; ok {
+			cp.nodeConnsLock.RLock()
+			currEndpoints, ok := cp.nodeConns[node]
+			cp.nodeConnsLock.Unlock()
+
+			if ok {
 				if !endpointListEqual(currEndpoints.Endpoints, newEndpoints) {
-					cp.logger.Debug("endpoints for node changed, recreating channel", slog.Uint64("node", node))
+					logger.Debug("endpoints for node changed, recreating channel")
 
-					currEndpoints.Channel.Close()
+					err := currEndpoints.Channel.Close()
+					if err != nil {
+						logger.Warn("failed to close channel", slog.Any("error", err))
+					}
 
 					// Either this is a new node or its endpoints have changed
-					err := cp.updateNodeConns(ctx, node, newEndpoints)
+					err = cp.updateNodeConns(ctx, node, newEndpoints)
 					if err != nil {
-						cp.logger.Error("failed to create new channel", slog.Uint64("node", node), slog.Any("error", err))
+						logger.Error("failed to create new channel", slog.Any("error", err))
 					}
 				}
 			}
@@ -333,8 +353,8 @@ func (cp *ChannelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndp
 }
 
 func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
-	cp.tendLock.Lock()
-	defer cp.tendLock.Unlock()
+	cp.nodeConnsLock.Lock()
+	defer cp.nodeConnsLock.Unlock()
 
 	// The cluster state changed. Remove old channels.
 	for node, channelEndpoints := range cp.nodeConns {
@@ -362,6 +382,7 @@ func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
 
 func (cp *ChannelProvider) tend(ctx context.Context) {
 	timer := time.NewTimer(cp.tendInterval)
+	defer timer.Stop()
 
 	for {
 		timer.Reset(cp.tendInterval)
@@ -378,10 +399,6 @@ func (cp *ChannelProvider) tend(ctx context.Context) {
 
 			cancel()
 		case <-cp.stopTendChan:
-			if !timer.Stop() {
-				<-timer.C
-			}
-
 			cp.stopTendChan <- struct{}{}
 			return
 		}
