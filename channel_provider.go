@@ -326,7 +326,6 @@ func (cp *ChannelProvider) checkAndSetNodeConns(
 
 		go func(node uint64, newEndpoints *protos.ServerEndpointList) {
 			defer wg.Done()
-
 			logger := cp.logger.With(slog.Uint64("node", node))
 
 			cp.nodeConnsLock.RLock()

@@ -65,6 +65,7 @@ func (c *AdminClient) IndexCreate(
 	if err != nil {
 		msg := "failed to create index"
 		logger.Error(msg, slog.Any("error", err))
+
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -98,6 +99,7 @@ func (c *AdminClient) IndexCreate(
 	if err != nil {
 		msg := "failed to create index"
 		logger.Error(msg, slog.Any("error", err))
+
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -242,6 +244,7 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 
 	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
+	defer timer.Stop()
 
 	defer timer.Stop()
 
@@ -257,10 +260,6 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 				select {
 				case <-timer.C:
 				case <-ctx.Done():
-					if !timer.Stop() {
-						<-timer.C
-					}
-
 					logger.ErrorContext(ctx, "waiting for index creation canceled")
 					return ctx.Err()
 				}
@@ -298,6 +297,7 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 
 	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
+	defer timer.Stop()
 
 	defer timer.Stop()
 
@@ -322,10 +322,6 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
-
 			logger.ErrorContext(ctx, "waiting for index deletion canceled")
 			return ctx.Err()
 		}
