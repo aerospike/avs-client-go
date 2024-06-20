@@ -244,6 +244,7 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 
 	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
+
 	defer timer.Stop()
 
 	for {
@@ -295,6 +296,7 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 
 	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
+
 	defer timer.Stop()
 
 	for {
