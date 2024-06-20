@@ -1,2 +1,2 @@
-# aerospike-proximus-client-go
+# avs-client-go
 🚀➡️🔍🐹
