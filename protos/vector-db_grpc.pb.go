@@ -113,10 +113,10 @@ type ClusterInfoClient interface {
 	GetNodeId(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*NodeId, error)
 	// Get current cluster-Id for the current cluster.
 	GetClusterId(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ClusterId, error)
+	// Get current cluster-Id for the current cluster.
+	GetClusteringState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ClusteringState, error)
 	// Get the advertised/listening endpoints for all nodes in the cluster, given a listener name.
 	GetClusterEndpoints(ctx context.Context, in *ClusterNodeEndpointsRequest, opts ...grpc.CallOption) (*ClusterNodeEndpoints, error)
-	// Get per-node owned partition list for all nodes in the cluster.
-	GetOwnedPartitions(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ClusterPartitions, error)
 }
 
 type clusterInfoClient struct {
@@ -145,18 +145,18 @@ func (c *clusterInfoClient) GetClusterId(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
-func (c *clusterInfoClient) GetClusterEndpoints(ctx context.Context, in *ClusterNodeEndpointsRequest, opts ...grpc.CallOption) (*ClusterNodeEndpoints, error) {
-	out := new(ClusterNodeEndpoints)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.ClusterInfo/GetClusterEndpoints", in, out, opts...)
+func (c *clusterInfoClient) GetClusteringState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ClusteringState, error) {
+	out := new(ClusteringState)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.ClusterInfo/GetClusteringState", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clusterInfoClient) GetOwnedPartitions(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ClusterPartitions, error) {
-	out := new(ClusterPartitions)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.ClusterInfo/GetOwnedPartitions", in, out, opts...)
+func (c *clusterInfoClient) GetClusterEndpoints(ctx context.Context, in *ClusterNodeEndpointsRequest, opts ...grpc.CallOption) (*ClusterNodeEndpoints, error) {
+	out := new(ClusterNodeEndpoints)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.ClusterInfo/GetClusterEndpoints", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -171,10 +171,10 @@ type ClusterInfoServer interface {
 	GetNodeId(context.Context, *emptypb.Empty) (*NodeId, error)
 	// Get current cluster-Id for the current cluster.
 	GetClusterId(context.Context, *emptypb.Empty) (*ClusterId, error)
+	// Get current cluster-Id for the current cluster.
+	GetClusteringState(context.Context, *emptypb.Empty) (*ClusteringState, error)
 	// Get the advertised/listening endpoints for all nodes in the cluster, given a listener name.
 	GetClusterEndpoints(context.Context, *ClusterNodeEndpointsRequest) (*ClusterNodeEndpoints, error)
-	// Get per-node owned partition list for all nodes in the cluster.
-	GetOwnedPartitions(context.Context, *emptypb.Empty) (*ClusterPartitions, error)
 	mustEmbedUnimplementedClusterInfoServer()
 }
 
@@ -188,11 +188,11 @@ func (UnimplementedClusterInfoServer) GetNodeId(context.Context, *emptypb.Empty)
 func (UnimplementedClusterInfoServer) GetClusterId(context.Context, *emptypb.Empty) (*ClusterId, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClusterId not implemented")
 }
+func (UnimplementedClusterInfoServer) GetClusteringState(context.Context, *emptypb.Empty) (*ClusteringState, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetClusteringState not implemented")
+}
 func (UnimplementedClusterInfoServer) GetClusterEndpoints(context.Context, *ClusterNodeEndpointsRequest) (*ClusterNodeEndpoints, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetClusterEndpoints not implemented")
-}
-func (UnimplementedClusterInfoServer) GetOwnedPartitions(context.Context, *emptypb.Empty) (*ClusterPartitions, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetOwnedPartitions not implemented")
 }
 func (UnimplementedClusterInfoServer) mustEmbedUnimplementedClusterInfoServer() {}
 
@@ -243,6 +243,24 @@ func _ClusterInfo_GetClusterId_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClusterInfo_GetClusteringState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterInfoServer).GetClusteringState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/aerospike.vector.ClusterInfo/GetClusteringState",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterInfoServer).GetClusteringState(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ClusterInfo_GetClusterEndpoints_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ClusterNodeEndpointsRequest)
 	if err := dec(in); err != nil {
@@ -257,24 +275,6 @@ func _ClusterInfo_GetClusterEndpoints_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClusterInfoServer).GetClusterEndpoints(ctx, req.(*ClusterNodeEndpointsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ClusterInfo_GetOwnedPartitions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ClusterInfoServer).GetOwnedPartitions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/aerospike.vector.ClusterInfo/GetOwnedPartitions",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClusterInfoServer).GetOwnedPartitions(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -295,12 +295,12 @@ var ClusterInfo_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ClusterInfo_GetClusterId_Handler,
 		},
 		{
-			MethodName: "GetClusterEndpoints",
-			Handler:    _ClusterInfo_GetClusterEndpoints_Handler,
+			MethodName: "GetClusteringState",
+			Handler:    _ClusterInfo_GetClusteringState_Handler,
 		},
 		{
-			MethodName: "GetOwnedPartitions",
-			Handler:    _ClusterInfo_GetOwnedPartitions_Handler,
+			MethodName: "GetClusterEndpoints",
+			Handler:    _ClusterInfo_GetClusterEndpoints_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

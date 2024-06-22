@@ -20,6 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Available vector distance metrics.
 type VectorDistanceMetric int32
 
 const (
@@ -75,6 +76,7 @@ func (VectorDistanceMetric) EnumDescriptor() ([]byte, []int) {
 	return file_types_proto_rawDescGZIP(), []int{0}
 }
 
+// Available index types.
 type IndexType int32
 
 const (
@@ -248,6 +250,7 @@ func (*Key_IntValue) isKey_Value() {}
 
 func (*Key_LongValue) isKey_Value() {}
 
+// A list of boolean data values.
 type BoolData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -295,6 +298,7 @@ func (x *BoolData) GetValue() []bool {
 	return nil
 }
 
+// A list of floating point data values.
 type FloatData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -342,6 +346,7 @@ func (x *FloatData) GetValue() []float32 {
 	return nil
 }
 
+// A key in a map type value.
 type MapKey struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -479,6 +484,7 @@ func (*MapKey_FloatValue) isMapKey_Value() {}
 
 func (*MapKey_DoubleValue) isMapKey_Value() {}
 
+// A map entry.
 type MapEntry struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -534,6 +540,7 @@ func (x *MapEntry) GetValue() *Value {
 	return nil
 }
 
+// A map/dictionary type.
 type Map struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -581,6 +588,7 @@ func (x *Map) GetEntries() []*MapEntry {
 	return nil
 }
 
+// A list type.
 type List struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -962,6 +970,7 @@ func (x *Field) GetValue() *Value {
 	return nil
 }
 
+// Metadata associated with records stored in Aerospike DB.
 type AerospikeRecordMetadata struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1098,7 +1107,7 @@ type Record_AerospikeMetadata struct {
 
 func (*Record_AerospikeMetadata) isRecord_Metadata() {}
 
-// TODO: For simplicity , include key in Record?
+// A neighbor result returned by vector search.
 type Neighbor struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1681,6 +1690,237 @@ func (x *IndexDefinitionList) GetIndices() []*IndexDefinition {
 	return nil
 }
 
+// A role.
+type Role struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Role's unique name/id
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (x *Role) Reset() {
+	*x = Role{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_proto_msgTypes[20]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Role) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Role) ProtoMessage() {}
+
+func (x *Role) ProtoReflect() protoreflect.Message {
+	mi := &file_types_proto_msgTypes[20]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Role.ProtoReflect.Descriptor instead.
+func (*Role) Descriptor() ([]byte, []int) {
+	return file_types_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Role) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+// A user.
+type User struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// User's username
+	Username string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	// Granted roles
+	Roles []string `protobuf:"bytes,2,rep,name=roles,proto3" json:"roles,omitempty"`
+}
+
+func (x *User) Reset() {
+	*x = User{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_proto_msgTypes[21]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *User) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*User) ProtoMessage() {}
+
+func (x *User) ProtoReflect() protoreflect.Message {
+	mi := &file_types_proto_msgTypes[21]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use User.ProtoReflect.Descriptor instead.
+func (*User) Descriptor() ([]byte, []int) {
+	return file_types_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *User) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *User) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+// Authentication credentials.
+type Credentials struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Username string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	// Types that are assignable to Credentials:
+	//
+	//	*Credentials_PasswordCredentials
+	Credentials isCredentials_Credentials `protobuf_oneof:"credentials"`
+}
+
+func (x *Credentials) Reset() {
+	*x = Credentials{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_proto_msgTypes[22]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Credentials) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Credentials) ProtoMessage() {}
+
+func (x *Credentials) ProtoReflect() protoreflect.Message {
+	mi := &file_types_proto_msgTypes[22]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Credentials.ProtoReflect.Descriptor instead.
+func (*Credentials) Descriptor() ([]byte, []int) {
+	return file_types_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *Credentials) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (m *Credentials) GetCredentials() isCredentials_Credentials {
+	if m != nil {
+		return m.Credentials
+	}
+	return nil
+}
+
+func (x *Credentials) GetPasswordCredentials() *PasswordCredentials {
+	if x, ok := x.GetCredentials().(*Credentials_PasswordCredentials); ok {
+		return x.PasswordCredentials
+	}
+	return nil
+}
+
+type isCredentials_Credentials interface {
+	isCredentials_Credentials()
+}
+
+type Credentials_PasswordCredentials struct {
+	PasswordCredentials *PasswordCredentials `protobuf:"bytes,2,opt,name=passwordCredentials,proto3,oneof"`
+}
+
+func (*Credentials_PasswordCredentials) isCredentials_Credentials() {}
+
+// Password credentials.
+type PasswordCredentials struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Password string `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+}
+
+func (x *PasswordCredentials) Reset() {
+	*x = PasswordCredentials{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_proto_msgTypes[23]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PasswordCredentials) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PasswordCredentials) ProtoMessage() {}
+
+func (x *PasswordCredentials) ProtoReflect() protoreflect.Message {
+	mi := &file_types_proto_msgTypes[23]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PasswordCredentials.ProtoReflect.Descriptor instead.
+func (*PasswordCredentials) Descriptor() ([]byte, []int) {
+	return file_types_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *PasswordCredentials) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
 // A boolean type
 type Boolean struct {
 	state         protoimpl.MessageState
@@ -1693,7 +1933,7 @@ type Boolean struct {
 func (x *Boolean) Reset() {
 	*x = Boolean{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_types_proto_msgTypes[20]
+		mi := &file_types_proto_msgTypes[24]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1706,7 +1946,7 @@ func (x *Boolean) String() string {
 func (*Boolean) ProtoMessage() {}
 
 func (x *Boolean) ProtoReflect() protoreflect.Message {
-	mi := &file_types_proto_msgTypes[20]
+	mi := &file_types_proto_msgTypes[24]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1719,7 +1959,7 @@ func (x *Boolean) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Boolean.ProtoReflect.Descriptor instead.
 func (*Boolean) Descriptor() ([]byte, []int) {
-	return file_types_proto_rawDescGZIP(), []int{20}
+	return file_types_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Boolean) GetValue() bool {
@@ -1922,22 +2162,40 @@ var file_types_proto_rawDesc = []byte{
 	0x12, 0x3b, 0x0a, 0x07, 0x69, 0x6e, 0x64, 0x69, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28,
 	0x0b, 0x32, 0x21, 0x2e, 0x61, 0x65, 0x72, 0x6f, 0x73, 0x70, 0x69, 0x6b, 0x65, 0x2e, 0x76, 0x65,
 	0x63, 0x74, 0x6f, 0x72, 0x2e, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69,
-	0x74, 0x69, 0x6f, 0x6e, 0x52, 0x07, 0x69, 0x6e, 0x64, 0x69, 0x63, 0x65, 0x73, 0x22, 0x1f, 0x0a,
-	0x07, 0x42, 0x6f, 0x6f, 0x6c, 0x65, 0x61, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
-	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x2a, 0x66,
-	0x0a, 0x14, 0x56, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x44, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65,
-	0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x12, 0x15, 0x0a, 0x11, 0x53, 0x51, 0x55, 0x41, 0x52, 0x45,
-	0x44, 0x5f, 0x45, 0x55, 0x43, 0x4c, 0x49, 0x44, 0x45, 0x41, 0x4e, 0x10, 0x00, 0x12, 0x0a, 0x0a,
-	0x06, 0x43, 0x4f, 0x53, 0x49, 0x4e, 0x45, 0x10, 0x01, 0x12, 0x0f, 0x0a, 0x0b, 0x44, 0x4f, 0x54,
-	0x5f, 0x50, 0x52, 0x4f, 0x44, 0x55, 0x43, 0x54, 0x10, 0x02, 0x12, 0x0d, 0x0a, 0x09, 0x4d, 0x41,
-	0x4e, 0x48, 0x41, 0x54, 0x54, 0x41, 0x4e, 0x10, 0x03, 0x12, 0x0b, 0x0a, 0x07, 0x48, 0x41, 0x4d,
-	0x4d, 0x49, 0x4e, 0x47, 0x10, 0x04, 0x2a, 0x15, 0x0a, 0x09, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x54,
-	0x79, 0x70, 0x65, 0x12, 0x08, 0x0a, 0x04, 0x48, 0x4e, 0x53, 0x57, 0x10, 0x00, 0x42, 0x3d, 0x0a,
-	0x1b, 0x63, 0x6f, 0x6d, 0x2e, 0x61, 0x65, 0x72, 0x6f, 0x73, 0x70, 0x69, 0x6b, 0x65, 0x2e, 0x76,
-	0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x50, 0x01, 0x5a, 0x1c,
-	0x61, 0x65, 0x72, 0x6f, 0x73, 0x70, 0x69, 0x6b, 0x65, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x76, 0x65,
-	0x63, 0x74, 0x6f, 0x72, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2f, 0x62, 0x06, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x69, 0x6f, 0x6e, 0x52, 0x07, 0x69, 0x6e, 0x64, 0x69, 0x63, 0x65, 0x73, 0x22, 0x16, 0x0a,
+	0x04, 0x52, 0x6f, 0x6c, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x02, 0x69, 0x64, 0x22, 0x38, 0x0a, 0x04, 0x55, 0x73, 0x65, 0x72, 0x12, 0x1a, 0x0a,
+	0x08, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x08, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x72, 0x6f, 0x6c,
+	0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x72, 0x6f, 0x6c, 0x65, 0x73, 0x22,
+	0x93, 0x01, 0x0a, 0x0b, 0x43, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x73, 0x12,
+	0x1a, 0x0a, 0x08, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x08, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x59, 0x0a, 0x13, 0x70,
+	0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x43, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61,
+	0x6c, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x25, 0x2e, 0x61, 0x65, 0x72, 0x6f, 0x73,
+	0x70, 0x69, 0x6b, 0x65, 0x2e, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x50, 0x61, 0x73, 0x73,
+	0x77, 0x6f, 0x72, 0x64, 0x43, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x73, 0x48,
+	0x00, 0x52, 0x13, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x43, 0x72, 0x65, 0x64, 0x65,
+	0x6e, 0x74, 0x69, 0x61, 0x6c, 0x73, 0x42, 0x0d, 0x0a, 0x0b, 0x63, 0x72, 0x65, 0x64, 0x65, 0x6e,
+	0x74, 0x69, 0x61, 0x6c, 0x73, 0x22, 0x31, 0x0a, 0x13, 0x50, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72,
+	0x64, 0x43, 0x72, 0x65, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x61, 0x6c, 0x73, 0x12, 0x1a, 0x0a, 0x08,
+	0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08,
+	0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x22, 0x1f, 0x0a, 0x07, 0x42, 0x6f, 0x6f, 0x6c,
+	0x65, 0x61, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x2a, 0x66, 0x0a, 0x14, 0x56, 0x65, 0x63,
+	0x74, 0x6f, 0x72, 0x44, 0x69, 0x73, 0x74, 0x61, 0x6e, 0x63, 0x65, 0x4d, 0x65, 0x74, 0x72, 0x69,
+	0x63, 0x12, 0x15, 0x0a, 0x11, 0x53, 0x51, 0x55, 0x41, 0x52, 0x45, 0x44, 0x5f, 0x45, 0x55, 0x43,
+	0x4c, 0x49, 0x44, 0x45, 0x41, 0x4e, 0x10, 0x00, 0x12, 0x0a, 0x0a, 0x06, 0x43, 0x4f, 0x53, 0x49,
+	0x4e, 0x45, 0x10, 0x01, 0x12, 0x0f, 0x0a, 0x0b, 0x44, 0x4f, 0x54, 0x5f, 0x50, 0x52, 0x4f, 0x44,
+	0x55, 0x43, 0x54, 0x10, 0x02, 0x12, 0x0d, 0x0a, 0x09, 0x4d, 0x41, 0x4e, 0x48, 0x41, 0x54, 0x54,
+	0x41, 0x4e, 0x10, 0x03, 0x12, 0x0b, 0x0a, 0x07, 0x48, 0x41, 0x4d, 0x4d, 0x49, 0x4e, 0x47, 0x10,
+	0x04, 0x2a, 0x15, 0x0a, 0x09, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x54, 0x79, 0x70, 0x65, 0x12, 0x08,
+	0x0a, 0x04, 0x48, 0x4e, 0x53, 0x57, 0x10, 0x00, 0x42, 0x43, 0x0a, 0x21, 0x63, 0x6f, 0x6d, 0x2e,
+	0x61, 0x65, 0x72, 0x6f, 0x73, 0x70, 0x69, 0x6b, 0x65, 0x2e, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72,
+	0x2e, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a,
+	0x1c, 0x61, 0x65, 0x72, 0x6f, 0x73, 0x70, 0x69, 0x6b, 0x65, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x76,
+	0x65, 0x63, 0x74, 0x6f, 0x72, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2f, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1953,7 +2211,7 @@ func file_types_proto_rawDescGZIP() []byte {
 }
 
 var file_types_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_types_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_types_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_types_proto_goTypes = []interface{}{
 	(VectorDistanceMetric)(0),       // 0: aerospike.vector.VectorDistanceMetric
 	(IndexType)(0),                  // 1: aerospike.vector.IndexType
@@ -1977,8 +2235,12 @@ var file_types_proto_goTypes = []interface{}{
 	(*IndexStorage)(nil),            // 19: aerospike.vector.IndexStorage
 	(*IndexDefinition)(nil),         // 20: aerospike.vector.IndexDefinition
 	(*IndexDefinitionList)(nil),     // 21: aerospike.vector.IndexDefinitionList
-	(*Boolean)(nil),                 // 22: aerospike.vector.Boolean
-	nil,                             // 23: aerospike.vector.IndexDefinition.LabelsEntry
+	(*Role)(nil),                    // 22: aerospike.vector.Role
+	(*User)(nil),                    // 23: aerospike.vector.User
+	(*Credentials)(nil),             // 24: aerospike.vector.Credentials
+	(*PasswordCredentials)(nil),     // 25: aerospike.vector.PasswordCredentials
+	(*Boolean)(nil),                 // 26: aerospike.vector.Boolean
+	nil,                             // 27: aerospike.vector.IndexDefinition.LabelsEntry
 }
 var file_types_proto_depIdxs = []int32{
 	5,  // 0: aerospike.vector.MapEntry.key:type_name -> aerospike.vector.MapKey
@@ -2000,14 +2262,15 @@ var file_types_proto_depIdxs = []int32{
 	1,  // 16: aerospike.vector.IndexDefinition.type:type_name -> aerospike.vector.IndexType
 	0,  // 17: aerospike.vector.IndexDefinition.vectorDistanceMetric:type_name -> aerospike.vector.VectorDistanceMetric
 	16, // 18: aerospike.vector.IndexDefinition.hnswParams:type_name -> aerospike.vector.HnswParams
-	23, // 19: aerospike.vector.IndexDefinition.labels:type_name -> aerospike.vector.IndexDefinition.LabelsEntry
+	27, // 19: aerospike.vector.IndexDefinition.labels:type_name -> aerospike.vector.IndexDefinition.LabelsEntry
 	19, // 20: aerospike.vector.IndexDefinition.storage:type_name -> aerospike.vector.IndexStorage
 	20, // 21: aerospike.vector.IndexDefinitionList.indices:type_name -> aerospike.vector.IndexDefinition
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	25, // 22: aerospike.vector.Credentials.passwordCredentials:type_name -> aerospike.vector.PasswordCredentials
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_types_proto_init() }
@@ -2257,6 +2520,54 @@ func file_types_proto_init() {
 			}
 		}
 		file_types_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Role); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_types_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*User); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_types_proto_msgTypes[22].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Credentials); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_types_proto_msgTypes[23].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PasswordCredentials); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_types_proto_msgTypes[24].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Boolean); i {
 			case 0:
 				return &v.state
@@ -2310,13 +2621,16 @@ func file_types_proto_init() {
 	file_types_proto_msgTypes[18].OneofWrappers = []interface{}{
 		(*IndexDefinition_HnswParams)(nil),
 	}
+	file_types_proto_msgTypes[22].OneofWrappers = []interface{}{
+		(*Credentials_PasswordCredentials)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_types_proto_rawDesc,
 			NumEnums:      2,
-			NumMessages:   22,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

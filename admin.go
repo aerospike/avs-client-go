@@ -18,7 +18,7 @@ const (
 
 type AdminClient struct {
 	logger          *slog.Logger
-	channelProvider *ChannelProvider
+	channelProvider *channelProvider
 }
 
 func NewAdminClient(
@@ -26,17 +26,21 @@ func NewAdminClient(
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
+	username *string,
+	password *string,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*AdminClient, error) {
 	logger = logger.WithGroup("avs.admin")
 	logger.Debug("creating new client")
 
-	channelProvider, err := NewChannelProvider(
+	channelProvider, err := newChannelProvider(
 		ctx,
 		seeds,
 		listenerName,
 		isLoadBalancer,
+		username,
+		password,
 		tlsConfig,
 		logger,
 	)

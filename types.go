@@ -7,16 +7,14 @@ import (
 )
 
 type HostPort struct {
-	Host  string
-	Port  int
-	isTLS bool
+	Host string
+	Port int
 }
 
-func NewHostPort(host string, port int, isTLS bool) *HostPort {
+func NewHostPort(host string, port int) *HostPort {
 	return &HostPort{
-		Host:  host,
-		Port:  port,
-		isTLS: isTLS,
+		Host: host,
+		Port: port,
 	}
 }
 
