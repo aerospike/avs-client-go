@@ -3,7 +3,7 @@ syntax = "proto3";
 package aerospike.vector;
 
 option go_package = "aerospike.com/vector/protos/";
-option java_package = "com.aerospike.vector.client";
+option java_package = "com.aerospike.vector.client.proto";
 option java_multiple_files = true;
 
 // A record key.
@@ -26,14 +26,17 @@ message Key {
   }
 }
 
+// A list of boolean data values.
 message BoolData {
   repeated bool value = 1;
 }
 
+// A list of floating point data values.
 message FloatData {
   repeated float value = 1;
 }
 
+// A key in a map type value.
 message MapKey {
   oneof value {
     string stringValue = 1;
@@ -50,15 +53,18 @@ message MapKey {
   }
 }
 
+// A map entry.
 message MapEntry {
   MapKey key = 1;
   Value value = 2;
 }
 
+// A map/dictionary type.
 message Map {
   repeated MapEntry entries = 1;
 }
 
+// A list type.
 message List {
   repeated Value entries = 1;
 }
@@ -103,6 +109,7 @@ message Field {
   Value value = 2;
 }
 
+// Metadata associated with records stored in Aerospike DB.
 message AerospikeRecordMetadata {
   // Record modification count.
   uint32 generation = 1;
@@ -122,7 +129,7 @@ message Record {
   }
 }
 
-// TODO: For simplicity , include key in Record?
+// A neighbor result returned by vector search.
 message Neighbor {
   // The result record key.
   Key key = 1;
@@ -144,6 +151,7 @@ message IndexId {
   string name = 2;
 }
 
+// Available vector distance metrics.
 enum VectorDistanceMetric {
   SQUARED_EUCLIDEAN = 0;
   COSINE = 1;
@@ -152,6 +160,7 @@ enum VectorDistanceMetric {
   HAMMING = 4;
 }
 
+// Available index types.
 enum IndexType {
   HNSW = 0;
 }
@@ -250,6 +259,34 @@ message IndexDefinition {
 // List of index definitions.
 message IndexDefinitionList {
   repeated IndexDefinition indices = 1;
+}
+
+// A role.
+message Role {
+  // Role's unique name/id
+  string id = 1;
+}
+
+// A user.
+message User {
+  // User's username
+  string username = 1;
+
+  // Granted roles
+  repeated string roles = 2;
+}
+
+// Authentication credentials.
+message Credentials {
+  string username = 1;
+  oneof credentials {
+    PasswordCredentials passwordCredentials = 2;
+  }
+}
+
+// Password credentials.
+message PasswordCredentials {
+  string password = 1;
 }
 
 // A boolean type

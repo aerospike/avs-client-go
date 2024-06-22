@@ -3,7 +3,7 @@ syntax = "proto3";
 package aerospike.vector;
 
 option go_package = "aerospike.com/vector/protos/";
-option java_package = "com.aerospike.vector.client";
+option java_package = "com.aerospike.vector.client.proto";
 option java_multiple_files = true;
 
 import "google/protobuf/empty.proto";

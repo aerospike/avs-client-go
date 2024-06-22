@@ -1,4 +1,4 @@
-PROTO_DIR = ./internal/protos
+PROTO_DIR = ./protos
 
 .PHONY: proto
 proto:

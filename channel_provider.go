@@ -19,22 +19,22 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type ChannelAndEndpoints struct {
+type channelAndEndpoints struct {
 	Channel   *grpc.ClientConn
 	Endpoints *protos.ServerEndpointList
 }
 
-func NewChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpointList) *ChannelAndEndpoints {
-	return &ChannelAndEndpoints{
+func newChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
+	return &channelAndEndpoints{
 		Channel:   channel,
 		Endpoints: endpoints,
 	}
 }
 
 //nolint:govet // We will favor readability over field alignment
-type ChannelProvider struct {
+type channelProvider struct {
 	logger         *slog.Logger
-	nodeConns      map[uint64]*ChannelAndEndpoints
+	nodeConns      map[uint64]*channelAndEndpoints
 	seedConns      []*grpc.ClientConn
 	tlsConfig      *tls.Config
 	seeds          HostPortSlice
@@ -43,29 +43,56 @@ type ChannelProvider struct {
 	clusterID      uint64
 	listenerName   *string
 	isLoadBalancer bool
+	token          *tokenManager
 	stopTendChan   chan struct{}
 	closed         bool
 }
 
-func NewChannelProvider(
+func newChannelProvider(
 	ctx context.Context,
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
+	username *string,
+	password *string,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
-) (*ChannelProvider, error) {
-	if len(seeds) == 0 {
-		return nil, fmt.Errorf("seeds cannot be nil or empty")
-	}
-
+) (*channelProvider, error) {
 	logger = logger.WithGroup("cp")
 
-	cp := &ChannelProvider{
-		nodeConns:      make(map[uint64]*ChannelAndEndpoints),
+	if len(seeds) == 0 {
+		msg := "seeds cannot be nil or empty"
+		logger.Error(msg)
+
+		return nil, fmt.Errorf(msg)
+	}
+
+	var token *tokenManager
+
+	if username != nil || password != nil {
+		if username == nil || password == nil {
+			msg := "username and password must both be set"
+			logger.Error(msg)
+
+			return nil, fmt.Errorf(msg)
+		}
+
+		token = newJWTToken(*username, *password, logger)
+
+		if token.RequireTransportSecurity() && tlsConfig == nil {
+			msg := "tlsConfig is required when username/password authentication"
+			logger.Error(msg)
+
+			return nil, fmt.Errorf(msg)
+		}
+	}
+
+	cp := &channelProvider{
+		nodeConns:      make(map[uint64]*channelAndEndpoints),
 		seeds:          seeds,
 		listenerName:   listenerName,
 		isLoadBalancer: isLoadBalancer,
+		token:          token,
 		tlsConfig:      tlsConfig,
 		tendInterval:   time.Second * 1,
 		nodeConnsLock:  &sync.RWMutex{},
@@ -79,6 +106,8 @@ func NewChannelProvider(
 		return nil, err
 	}
 
+	cp.token.ScheduleRefresh(cp.GetConn)
+
 	if !isLoadBalancer {
 		cp.logger.Debug("starting tend routine")
 		cp.updateClusterChannels(ctx)    // We want at least one tend to occur before we return
@@ -90,13 +119,15 @@ func NewChannelProvider(
 	return cp, nil
 }
 
-func (cp *ChannelProvider) Close() error {
+func (cp *channelProvider) Close() error {
 	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
 		<-cp.stopTendChan
 	}
 
 	var firstErr error
+
+	cp.token.Close()
 
 	for _, channel := range cp.seedConns {
 		err := channel.Close()
@@ -132,7 +163,7 @@ func (cp *ChannelProvider) Close() error {
 	return firstErr
 }
 
-func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
+func (cp *channelProvider) GetConn() (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
@@ -146,7 +177,7 @@ func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	discoverdChannels := make([]*ChannelAndEndpoints, len(cp.nodeConns))
+	discoverdChannels := make([]*channelAndEndpoints, len(cp.nodeConns))
 
 	for i, channel := range cp.nodeConns {
 		discoverdChannels[i] = channel
@@ -162,7 +193,7 @@ func (cp *ChannelProvider) GetConn() (*grpc.ClientConn, error) {
 	return discoverdChannels[idx].Channel, nil
 }
 
-func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
+func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) != 0 {
 		msg := "seed channels already exist, close them first"
 		cp.logger.Error(msg)
@@ -173,6 +204,7 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	wg := sync.WaitGroup{}
 	seedCons := make(chan *grpc.ClientConn)
 	cp.seedConns = []*grpc.ClientConn{}
+	var authErr error
 
 	for _, seed := range cp.seeds {
 		wg.Add(1)
@@ -188,12 +220,32 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 				return
 			}
 
-			client := protos.NewClusterInfoClient(conn)
+			extra_check := true
 
-			_, err = client.GetClusterId(ctx, &emptypb.Empty{})
-			if err != nil {
-				logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
-				return
+			if cp.token != nil {
+				// Only one thread needs to refresh the token. Only first will
+				// succeed others will block
+				updated, err := cp.token.RefreshToken(ctx, conn)
+				if err != nil {
+					logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
+					authErr = err
+					return
+				}
+
+				// No need to check this conn again for successful connectivity
+				if updated {
+					extra_check = false
+				}
+			}
+
+			if extra_check {
+				client := protos.NewClusterInfoClient(conn)
+
+				_, err = client.GetClusterId(ctx, &emptypb.Empty{})
+				if err != nil {
+					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
+					return
+				}
 			}
 
 			seedCons <- conn
@@ -212,8 +264,12 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) == 0 {
 		msg := "failed to connect to seeds"
 
+		if authErr != nil {
+			return NewAVSErrorFromGrpc(msg, authErr)
+		}
+
 		if err := ctx.Err(); err != nil {
-			msg = fmt.Sprintf("%s: %s", msg, err.Error())
+			msg = fmt.Sprintf("%s: %s", msg, err)
 		}
 
 		return NewAVSError(msg)
@@ -222,7 +278,7 @@ func (cp *ChannelProvider) connectToSeeds(ctx context.Context) error {
 	return nil
 }
 
-func (cp *ChannelProvider) updateNodeConns(
+func (cp *channelProvider) updateNodeConns(
 	node uint64,
 	endpoints *protos.ServerEndpointList,
 ) error {
@@ -238,7 +294,7 @@ func (cp *ChannelProvider) updateNodeConns(
 	return nil
 }
 
-func (cp *ChannelProvider) checkAndSetClusterID(clusterID uint64) bool {
+func (cp *channelProvider) checkAndSetClusterID(clusterID uint64) bool {
 	if clusterID != cp.clusterID {
 		cp.clusterID = clusterID
 		return true
@@ -267,7 +323,7 @@ func (cp *ChannelProvider) getTendConns() []*grpc.ClientConn {
 	return channels
 }
 
-func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
+func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
 	conns := cp.getTendConns()
 	endpointsChan := make(chan map[uint64]*protos.ServerEndpointList)
 	endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
@@ -318,10 +374,7 @@ func (cp *ChannelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 	return maxTempEndpoints
 }
 
-func (cp *ChannelProvider) checkAndSetNodeConns(
-	ctx context.Context,
-	newNodeEndpoints map[uint64]*protos.ServerEndpointList,
-) {
+func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	wg := sync.WaitGroup{}
 
 	// Find which nodes have a different endpoint list and update their channel
@@ -361,7 +414,7 @@ func (cp *ChannelProvider) checkAndSetNodeConns(
 	wg.Wait()
 }
 
-func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
+func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	cp.nodeConnsLock.Lock()
 	defer cp.nodeConnsLock.Unlock()
 
@@ -378,7 +431,7 @@ func (cp *ChannelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	}
 }
 
-func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
+func (cp *channelProvider) updateClusterChannels(ctx context.Context) {
 	updatedEndpoints := cp.getUpdatedEndpoints(ctx)
 	if updatedEndpoints == nil {
 		cp.logger.Debug("no new cluster ID found, cluster state is unchanged, skipping channel discovery")
@@ -387,11 +440,11 @@ func (cp *ChannelProvider) updateClusterChannels(ctx context.Context) {
 
 	cp.logger.Debug("new endpoints found, updating channels", slog.Any("endpoints", updatedEndpoints))
 
-	cp.checkAndSetNodeConns(ctx, updatedEndpoints)
+	cp.checkAndSetNodeConns(updatedEndpoints)
 	cp.removeDownNodes(updatedEndpoints)
 }
 
-func (cp *ChannelProvider) tend(ctx context.Context) {
+func (cp *channelProvider) tend(ctx context.Context) {
 	timer := time.NewTimer(cp.tendInterval)
 	defer timer.Stop()
 
@@ -460,10 +513,10 @@ func endpointListEqual(a, b *protos.ServerEndpointList) bool {
 }
 
 func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
-	return NewHostPort(endpoint.Address, int(endpoint.Port), endpoint.IsTls)
+	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
-func (cp *ChannelProvider) createChannelFromEndpoints(
+func (cp *channelProvider) createChannelFromEndpoints(
 	endpoints *protos.ServerEndpointList,
 ) (*grpc.ClientConn, error) {
 	for _, endpoint := range endpoints.Endpoints {
@@ -481,7 +534,7 @@ func (cp *ChannelProvider) createChannelFromEndpoints(
 	return nil, errors.New("no valid endpoint found")
 }
 
-func (cp *ChannelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, error) {
+func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {
@@ -490,6 +543,13 @@ func (cp *ChannelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, 
 	} else {
 		cp.logger.Debug("using secure tls connection to host", slog.String("host", hostPort.String()))
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(cp.tlsConfig)))
+	}
+
+	if cp.token != nil {
+		opts = append(opts,
+			grpc.WithUnaryInterceptor(cp.token.UnaryInterceptor()),
+			grpc.WithStreamInterceptor(cp.token.StreamInterceptor()),
+		)
 	}
 
 	conn, err := grpc.NewClient(
