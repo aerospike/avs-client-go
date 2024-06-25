@@ -106,7 +106,9 @@ func newChannelProvider(
 		return nil, err
 	}
 
-	cp.token.ScheduleRefresh(cp.GetConn)
+	if token != nil {
+		cp.token.ScheduleRefresh(cp.GetConn)
+	}
 
 	if !isLoadBalancer {
 		cp.logger.Debug("starting tend routine")
@@ -127,7 +129,9 @@ func (cp *channelProvider) Close() error {
 
 	var firstErr error
 
-	cp.token.Close()
+	if cp.token != nil {
+		cp.token.Close()
+	}
 
 	for _, channel := range cp.seedConns {
 		err := channel.Close()
@@ -205,6 +209,8 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 	seedCons := make(chan *grpc.ClientConn)
 	cp.seedConns = []*grpc.ClientConn{}
 	var authErr error
+	tokenLock := sync.Mutex{} // Ensures only one thread attempts to update token at a time
+	tokenUpdated := false     // Ensures token update only occurs once
 
 	for _, seed := range cp.seeds {
 		wg.Add(1)
@@ -224,19 +230,25 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 			if cp.token != nil {
 				// Only one thread needs to refresh the token. Only first will
 				// succeed others will block
-				updated, err := cp.token.RefreshToken(ctx, conn)
-				if err != nil {
-					logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
-					authErr = err
-					return
-				}
+				tokenLock.Lock()
+				if !tokenUpdated {
+					updated, err := cp.token.RefreshToken(ctx, conn)
+					if err != nil {
+						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
+						authErr = err
+						return
+					}
 
-				// No need to check this conn again for successful connectivity
-				if updated {
-					extra_check = false
+					// No need to check this conn again for successful connectivity
+					if updated {
+						extra_check = false
+						tokenUpdated = true
+					}
 				}
+				tokenLock.Unlock()
 			}
 
+			// TODO: Check compatible client/server version here
 			if extra_check {
 				client := protos.NewClusterInfoClient(conn)
 
