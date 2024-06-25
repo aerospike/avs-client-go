@@ -64,7 +64,7 @@ func newChannelProvider(
 		msg := "seeds cannot be nil or empty"
 		logger.Error(msg)
 
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 
 	var token *tokenManager
@@ -74,7 +74,7 @@ func newChannelProvider(
 			msg := "username and password must both be set"
 			logger.Error(msg)
 
-			return nil, fmt.Errorf(msg)
+			return nil, errors.New(msg)
 		}
 
 		token = newJWTToken(*username, *password, logger)
@@ -83,7 +83,7 @@ func newChannelProvider(
 			msg := "tlsConfig is required when username/password authentication"
 			logger.Error(msg)
 
-			return nil, fmt.Errorf(msg)
+			return nil, errors.New(msg)
 		}
 	}
 
@@ -112,7 +112,8 @@ func newChannelProvider(
 
 	if !isLoadBalancer {
 		cp.logger.Debug("starting tend routine")
-		cp.updateClusterChannels(ctx)    // We want at least one tend to occur before we return
+		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
+
 		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
@@ -205,10 +206,11 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 		return errors.New(msg)
 	}
 
+	var authErr error
+
 	wg := sync.WaitGroup{}
 	seedCons := make(chan *grpc.ClientConn)
 	cp.seedConns = []*grpc.ClientConn{}
-	var authErr error
 	tokenLock := sync.Mutex{} // Ensures only one thread attempts to update token at a time
 	tokenUpdated := false     // Ensures token update only occurs once
 
@@ -226,7 +228,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 				return
 			}
 
-			extra_check := true
+			extraCheck := true
 
 			if cp.token != nil {
 				// Only one thread needs to refresh the token. Only first will
@@ -237,12 +239,13 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
+
 						return
 					}
 
 					// No need to check this conn again for successful connectivity
 					if updated {
-						extra_check = false
+						extraCheck = false
 						tokenUpdated = true
 					}
 				}
@@ -250,7 +253,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 			}
 
 			// TODO: Check compatible client/server version here
-			if extra_check {
+			if extraCheck {
 				client := protos.NewClusterInfoClient(conn)
 
 				_, err = client.GetClusterId(ctx, &emptypb.Empty{})
@@ -300,7 +303,7 @@ func (cp *channelProvider) updateNodeConns(
 	}
 
 	cp.nodeConnsLock.Lock()
-	cp.nodeConns[node] = NewChannelAndEndpoints(newChannel, endpoints)
+	cp.nodeConns[node] = newChannelAndEndpoints(newChannel, endpoints)
 	cp.nodeConnsLock.Unlock()
 
 	return nil
@@ -315,7 +318,7 @@ func (cp *channelProvider) checkAndSetClusterID(clusterID uint64) bool {
 	return false
 }
 
-func (cp *ChannelProvider) getTendConns() []*grpc.ClientConn {
+func (cp *channelProvider) getTendConns() []*grpc.ClientConn {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
@@ -551,9 +554,11 @@ func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, 
 
 	if cp.tlsConfig == nil {
 		cp.logger.Debug("using insecure connection to host", slog.String("host", hostPort.String()))
+
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
 		cp.logger.Debug("using secure tls connection to host", slog.String("host", hostPort.String()))
+
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(cp.tlsConfig)))
 	}
 

@@ -15,7 +15,10 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// tokenManager is responsible for managing authentication tokens and refreshing them when necessary.
+// tokenManager is responsible for managing authentication tokens and refreshing
+// them when necessary.
+//
+//nolint:govet // We will favor readability over field alignment
 type tokenManager struct {
 	username         string
 	password         string
@@ -71,7 +74,6 @@ func (tm *tokenManager) expired() bool {
 // an error if any. It is not thread safe.
 func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnInterface) (bool, error) {
 	// We only want one goroutine to refresh the token at a time
-
 	client := protos.NewAuthServiceClient(conn)
 	resp, err := client.Authenticate(ctx, &protos.AuthRequest{
 		Credentials: &protos.Credentials{
@@ -83,18 +85,21 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 			},
 		},
 	})
+
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	claims := strings.Split(resp.GetToken(), ".")
 	decClaims, err := base64.RawURLEncoding.DecodeString(claims[1])
+
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	tokenMap := make(map[string]interface{}, 8)
 	err = json.Unmarshal(decClaims, &tokenMap)
+
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
@@ -107,14 +112,20 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	iat, ok := tokenMap["iat"].(float64)
 	if !ok {
 		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
-
 	}
 
 	ttl := time.Duration(expiryToken-iat) * time.Second
 	if ttl <= 0 {
 		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
-	tm.logger.DebugContext(ctx, "successfully parsed token", slog.Float64("exp", expiryToken), slog.Float64("iat", iat), slog.Duration("ttl", ttl))
+
+	tm.logger.DebugContext(
+		ctx,
+		"successfully parsed token",
+		slog.Float64("exp", expiryToken),
+		slog.Float64("iat", iat),
+		slog.Duration("ttl", ttl),
+	)
 
 	// Set expiry based on local clock.
 	tm.setRefreshTimeFromTTL(ttl)
@@ -160,16 +171,16 @@ func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)
 			select {
 			case <-timer.C:
 			case <-tm.stopRefreshChan:
-				timer.Stop()
 				tm.refreshScheduled = false
-				tm.stopRefreshChan <- struct{}{}
 
+				timer.Stop()
+				tm.stopRefreshChan <- struct{}{}
 				tm.logger.Debug("stopped scheduled token refresh")
+
 				return
 			}
 		}
 	}()
-
 }
 
 // RequireTransportSecurity returns true to indicate that transport security is required.
@@ -206,11 +217,11 @@ func (tm *tokenManager) StreamInterceptor() grpc.StreamClientInterceptor {
 }
 
 // attachToken attaches the authentication token to the outgoing context.
-func (jm *tokenManager) attachToken(ctx context.Context) context.Context {
-	rawToken := jm.token.Load()
+func (tm *tokenManager) attachToken(ctx context.Context) context.Context {
+	rawToken := tm.token.Load()
 	if rawToken == nil {
 		return ctx
 	}
 
-	return metadata.AppendToOutgoingContext(ctx, "Authorization", jm.token.Load().(string))
+	return metadata.AppendToOutgoingContext(ctx, "Authorization", tm.token.Load().(string))
 }
