@@ -1,16 +1,12 @@
 # Aerospike Vector Search Go Client
 
-> :warning: The go client is currently in development. APIs will break!
+> :warning: The go client is currently in development. APIs will break in the future!
 
 ## Overview
 
-This repository contains the Go client for interacting with Aerospike's vector search capabilities. It is designed to provide an easy-to-use interface for performing vector searches within an Aerospike cluster.
-
-## Example Usage
-
-```go
-// Example code will be provided once the API is stable.
-```
+This repository contains the Go client for interacting with Aerospike Vector
+Search (AVS) capabilities. It is designed to provide an easy-to-use interface for
+performing vector searches with an Aerospike cluster.
 
 ## Current Functionality
 - Connection to Aerospike clusters
@@ -23,7 +19,7 @@ To install the Aerospike Vector Search Go Client, use the following command:
 go get github.com/aerospike/aerospike-vector-search-go-client
 ```
 
-## Quick Start
+## Example Usage
 Here's a quick example to get you started:
 ```go
 package main
@@ -109,4 +105,4 @@ func main() {
 ```
 
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the [Apache License 2.0](./LICENSE)
