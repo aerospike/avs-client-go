@@ -1,3 +1,4 @@
+// Package avs provides a channel provider for connecting to Aerospike servers.
 package avs
 
 import (
@@ -19,11 +20,13 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// channelAndEndpoints represents a combination of a gRPC client connection and server endpoints.
 type channelAndEndpoints struct {
 	Channel   *grpc.ClientConn
 	Endpoints *protos.ServerEndpointList
 }
 
+// newChannelAndEndpoints creates a new channelAndEndpoints instance.
 func newChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
 	return &channelAndEndpoints{
 		Channel:   channel,
@@ -31,7 +34,7 @@ func newChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEn
 	}
 }
 
-//nolint:govet // We will favor readability over field alignment
+// channelProvider is responsible for managing gRPC client connections to Aerospike servers.
 type channelProvider struct {
 	logger         *slog.Logger
 	nodeConns      map[uint64]*channelAndEndpoints
@@ -48,6 +51,7 @@ type channelProvider struct {
 	closed         bool
 }
 
+// newChannelProvider creates a new channelProvider instance.
 func newChannelProvider(
 	ctx context.Context,
 	seeds HostPortSlice,
@@ -58,22 +62,22 @@ func newChannelProvider(
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*channelProvider, error) {
+	// Initialize the logger.
 	logger = logger.WithGroup("cp")
 
+	// Validate the seeds.
 	if len(seeds) == 0 {
 		msg := "seeds cannot be nil or empty"
 		logger.Error(msg)
-
 		return nil, errors.New(msg)
 	}
 
+	// Create a token manager if username and password are provided.
 	var token *tokenManager
-
 	if username != nil || password != nil {
 		if username == nil || password == nil {
 			msg := "username and password must both be set"
 			logger.Error(msg)
-
 			return nil, errors.New(msg)
 		}
 
@@ -82,11 +86,11 @@ func newChannelProvider(
 		if token.RequireTransportSecurity() && tlsConfig == nil {
 			msg := "tlsConfig is required when username/password authentication"
 			logger.Error(msg)
-
 			return nil, errors.New(msg)
 		}
 	}
 
+	// Create the channelProvider instance.
 	cp := &channelProvider{
 		nodeConns:      make(map[uint64]*channelAndEndpoints),
 		seeds:          seeds,
@@ -100,20 +104,22 @@ func newChannelProvider(
 		logger:         logger,
 	}
 
+	// Connect to the seed nodes.
 	err := cp.connectToSeeds(ctx)
 	if err != nil {
 		logger.Error("failed to connect to seeds", slog.Any("error", err))
 		return nil, err
 	}
 
+	// Schedule token refresh if token manager is present.
 	if token != nil {
 		cp.token.ScheduleRefresh(cp.GetConn)
 	}
 
+	// Start the tend routine if load balancing is disabled.
 	if !isLoadBalancer {
 		cp.logger.Debug("starting tend routine")
-		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
-
+		cp.updateClusterChannels(ctx)    // We want at least one tend to occur before we return
 		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
@@ -122,6 +128,7 @@ func newChannelProvider(
 	return cp, nil
 }
 
+// Close closes the channelProvider and releases all resources.
 func (cp *channelProvider) Close() error {
 	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
@@ -168,6 +175,7 @@ func (cp *channelProvider) Close() error {
 	return firstErr
 }
 
+// GetConn returns a gRPC client connection to an Aerospike server.
 func (cp *channelProvider) GetConn() (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
@@ -198,11 +206,11 @@ func (cp *channelProvider) GetConn() (*grpc.ClientConn, error) {
 	return discoverdChannels[idx].Channel, nil
 }
 
+// connectToSeeds connects to the seed nodes and creates gRPC client connections.
 func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) != 0 {
 		msg := "seed channels already exist, close them first"
 		cp.logger.Error(msg)
-
 		return errors.New(msg)
 	}
 
@@ -238,7 +246,6 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
-
 						return
 					}
 
@@ -292,6 +299,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 	return nil
 }
 
+// updateNodeConns updates the gRPC client connection for a specific node.
 func (cp *channelProvider) updateNodeConns(
 	node uint64,
 	endpoints *protos.ServerEndpointList,
@@ -308,6 +316,7 @@ func (cp *channelProvider) updateNodeConns(
 	return nil
 }
 
+// checkAndSetClusterID checks if the cluster ID has changed and updates it if necessary.
 func (cp *channelProvider) checkAndSetClusterID(clusterID uint64) bool {
 	if clusterID != cp.clusterID {
 		cp.clusterID = clusterID
@@ -317,6 +326,7 @@ func (cp *channelProvider) checkAndSetClusterID(clusterID uint64) bool {
 	return false
 }
 
+// getTendConns returns all the gRPC client connections for tend operations.
 func (cp *channelProvider) getTendConns() []*grpc.ClientConn {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
@@ -337,6 +347,7 @@ func (cp *channelProvider) getTendConns() []*grpc.ClientConn {
 	return channels
 }
 
+// getUpdatedEndpoints retrieves the updated server endpoints from the Aerospike cluster.
 func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
 	conns := cp.getTendConns()
 	endpointsChan := make(chan map[uint64]*protos.ServerEndpointList)
@@ -388,6 +399,7 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 	return maxTempEndpoints
 }
 
+// checkAndSetNodeConns checks if the node connections need to be updated and updates them if necessary.
 func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	wg := sync.WaitGroup{}
 
@@ -402,7 +414,7 @@ func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 
 			cp.nodeConnsLock.RLock()
 			currEndpoints, ok := cp.nodeConns[node]
-			cp.nodeConnsLock.Unlock()
+			cp.nodeConnsLock.RUnlock()
 
 			if ok {
 				if !endpointListEqual(currEndpoints.Endpoints, newEndpoints) {
@@ -428,6 +440,8 @@ func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 	wg.Wait()
 }
 
+// removeDownNodes removes the gRPC client connections for nodes in nodeConns
+// that arn't apart of newNodeEndpoints
 func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	cp.nodeConnsLock.Lock()
 	defer cp.nodeConnsLock.Unlock()
@@ -445,6 +459,8 @@ func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	}
 }
 
+// updateClusterChannels updates the gRPC client connections for the Aerospike
+// cluster if the cluster state has changed.
 func (cp *channelProvider) updateClusterChannels(ctx context.Context) {
 	updatedEndpoints := cp.getUpdatedEndpoints(ctx)
 	if updatedEndpoints == nil {
@@ -458,6 +474,7 @@ func (cp *channelProvider) updateClusterChannels(ctx context.Context) {
 	cp.removeDownNodes(updatedEndpoints)
 }
 
+// tend starts a thread to periodically update the cluster channels.
 func (cp *channelProvider) tend(ctx context.Context) {
 	timer := time.NewTimer(cp.tendInterval)
 	defer timer.Stop()
@@ -530,6 +547,8 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
+// createChannelFromEndpoints creates a gRPC client connection from the first
+// successful endpoint in endpoints.
 func (cp *channelProvider) createChannelFromEndpoints(
 	endpoints *protos.ServerEndpointList,
 ) (*grpc.ClientConn, error) {
@@ -548,6 +567,8 @@ func (cp *channelProvider) createChannelFromEndpoints(
 	return nil, errors.New("no valid endpoint found")
 }
 
+// createChannel creates a gRPC client connection to a host. This handles adding
+// credential and configuring tls.
 func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 
