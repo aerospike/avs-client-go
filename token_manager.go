@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,30 +15,32 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// tokenManager is responsible for managing authentication tokens and refreshing them when necessary.
 type tokenManager struct {
 	username         string
 	password         string
 	token            atomic.Value
 	refreshTime      atomic.Value
-	lock             sync.Mutex
 	logger           *slog.Logger
 	stopRefreshChan  chan struct{}
 	refreshScheduled bool
 }
 
+// newJWTToken creates a new tokenManager instance with the provided username, password, and logger.
 func newJWTToken(username, password string, logger *slog.Logger) *tokenManager {
 	logger.WithGroup("jwt")
 
 	logger.Debug("creating new token manager")
 
 	return &tokenManager{
-		username: username,
-		password: password,
-		lock:     sync.Mutex{},
-		logger:   logger,
+		username:        username,
+		password:        password,
+		logger:          logger,
+		stopRefreshChan: make(chan struct{}),
 	}
 }
 
+// Close stops the scheduled token refresh and closes the token manager.
 func (tm *tokenManager) Close() {
 	if tm.refreshScheduled {
 		tm.logger.Debug("stopping scheduled token refresh")
@@ -50,23 +51,26 @@ func (tm *tokenManager) Close() {
 	tm.logger.Debug("closed")
 }
 
+// setRefreshTimeFromTTL sets the refresh time based on the provided time-to-live (TTL) duration.
 func (tm *tokenManager) setRefreshTimeFromTTL(ttl time.Duration) {
 	tm.refreshTime.Store(time.Now().Add(ttl))
 }
 
+// expired checks if the token has expired.
 func (tm *tokenManager) expired() bool {
-	return time.Now().After(tm.refreshTime.Load().(time.Time))
+	expiredTime := tm.refreshTime.Load()
+	if expiredTime == nil {
+		return true
+	}
+
+	return time.Now().After(expiredTime.(time.Time))
 }
 
+// RefreshToken refreshes the authentication token using the provided gRPC client connection.
+// It returns a boolean indicating if the token was successfully refreshed and
+// an error if any. It is not thread safe.
 func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnInterface) (bool, error) {
 	// We only want one goroutine to refresh the token at a time
-	tm.lock.Lock()
-	defer tm.lock.Unlock()
-
-	// If it does not need to be updated return
-	if !tm.expired() {
-		return false, nil
-	}
 
 	client := protos.NewAuthServiceClient(conn)
 	resp, err := client.Authenticate(ctx, &protos.AuthRequest{
@@ -110,6 +114,7 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	if ttl <= 0 {
 		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
+	tm.logger.DebugContext(ctx, "successfully parsed token", slog.Float64("exp", expiryToken), slog.Float64("iat", iat), slog.Duration("ttl", ttl))
 
 	// Set expiry based on local clock.
 	tm.setRefreshTimeFromTTL(ttl)
@@ -118,6 +123,9 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	return true, nil
 }
 
+// ScheduleRefresh schedules the token refresh using the provided function to
+// get the gRPC client connection. This is not threadsafe. It should only be
+// called once.
 func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)) {
 	if tm.refreshScheduled {
 		tm.logger.WarnContext(context.Background(), "refresh already scheduled")
@@ -128,46 +136,48 @@ func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)
 	tm.refreshScheduled = true
 	timer := time.NewTimer(0)
 
-	defer func() {
-		timer.Stop()
-		tm.stopRefreshChan <- struct{}{}
-		tm.refreshScheduled = false
+	go func() {
+		for {
+			conn, err := getConn()
+			if err != nil {
+				tm.logger.WarnContext(context.Background(), "failed to refresh token", slog.Any("error", err))
+			}
 
-		tm.logger.Debug("stopped scheduled token refresh")
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+			_, err = tm.RefreshToken(ctx, conn)
+			if err != nil {
+				tm.logger.WarnContext(context.Background(), "failed to refresh token", slog.Any("error", err))
+			}
+
+			cancel()
+
+			waitFor := time.Until(tm.refreshTime.Load().(time.Time)) - time.Second*5
+
+			tm.logger.Debug("waiting to refresh token", slog.Duration("waitTime", waitFor))
+			timer.Reset(waitFor)
+
+			select {
+			case <-timer.C:
+			case <-tm.stopRefreshChan:
+				timer.Stop()
+				tm.refreshScheduled = false
+				tm.stopRefreshChan <- struct{}{}
+
+				tm.logger.Debug("stopped scheduled token refresh")
+				return
+			}
+		}
 	}()
 
-	for {
-		conn, err := getConn()
-		if err != nil {
-			tm.logger.WarnContext(context.Background(), "failed to refresh token", slog.Any("error", err))
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-
-		_, err = tm.RefreshToken(ctx, conn)
-		if err != nil {
-			tm.logger.WarnContext(context.Background(), "failed to refresh token", slog.Any("error", err))
-		}
-
-		cancel()
-
-		waitFor := time.Until(tm.refreshTime.Load().(time.Time)) - time.Second*5
-
-		tm.logger.Debug("waiting to refresh token", slog.Duration("waitTime", waitFor))
-		timer.Reset(waitFor)
-
-		select {
-		case <-timer.C:
-		case <-tm.stopRefreshChan:
-			return
-		}
-	}
 }
 
+// RequireTransportSecurity returns true to indicate that transport security is required.
 func (tm *tokenManager) RequireTransportSecurity() bool {
 	return true
 }
 
+// UnaryInterceptor returns the grpc unary client interceptor that attaches the token to outgoing requests.
 func (tm *tokenManager) UnaryInterceptor() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -181,6 +191,7 @@ func (tm *tokenManager) UnaryInterceptor() grpc.UnaryClientInterceptor {
 	}
 }
 
+// StreamInterceptor returns the grpc stream client interceptor that attaches the token to outgoing requests.
 func (tm *tokenManager) StreamInterceptor() grpc.StreamClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -194,6 +205,12 @@ func (tm *tokenManager) StreamInterceptor() grpc.StreamClientInterceptor {
 	}
 }
 
+// attachToken attaches the authentication token to the outgoing context.
 func (jm *tokenManager) attachToken(ctx context.Context) context.Context {
+	rawToken := jm.token.Load()
+	if rawToken == nil {
+		return ctx
+	}
+
 	return metadata.AppendToOutgoingContext(ctx, "Authorization", jm.token.Load().(string))
 }
