@@ -333,8 +333,8 @@ func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password 
 	return nil
 }
 
-// def drop_user(self, *, username: str) -> int:
-func (c *AdminClient) drop_user(ctx context.Context, username string) error {
+// def DropUser(self, *, username: str) -> int:
+func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
 
 	conn, err := c.channelProvider.GetConn()
