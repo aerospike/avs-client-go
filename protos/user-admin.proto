@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package aerospike.vector;
+
+option go_package = "aerospike.com/vector/protos/";
+option java_package = "com.aerospike.vector.client.proto";
+option java_multiple_files = true;
+
+import "google/protobuf/empty.proto";
+import "types.proto";
+
+// Add a new user
+message AddUserRequest {
+  Credentials credentials = 1;
+
+  // Granted roles
+  repeated string roles = 2;
+}
+
+// Update user credentials
+message UpdateCredentialsRequest {
+  Credentials credentials = 1;
+}
+
+// Update user credentials
+message DropUserRequest {
+  string username = 1;
+}
+
+// Update user credentials
+message GetUserRequest {
+  string username = 1;
+}
+
+// Grant roles request
+message GrantRolesRequest {
+  string username = 1;
+  repeated string roles = 2;
+}
+
+// Revoke roles request
+message RevokeRolesRequest {
+  string username = 1;
+  repeated string roles = 2;
+}
+
+// A list of roles.
+message ListRolesResponse {
+  // List of roles.
+  repeated Role roles = 1;
+}
+
+// A list of users.
+message ListUsersResponse {
+  // List of users.
+  repeated User users = 1;
+}
+
+// User admin service
+service UserAdminService {
+  // Add a new user.
+  rpc AddUser(AddUserRequest) returns (google.protobuf.Empty) {}
+
+  // Update user credentials.
+  rpc UpdateCredentials(UpdateCredentialsRequest) returns (google.protobuf.Empty) {}
+
+  // Drop a user.
+  rpc DropUser(DropUserRequest) returns (google.protobuf.Empty) {}
+
+  // Get details for a user.
+  rpc GetUser(GetUserRequest) returns (User) {}
+
+  // List users.
+  rpc ListUsers(google.protobuf.Empty) returns (ListUsersResponse) {}
+
+  // Grant roles to a user.
+  rpc GrantRoles(GrantRolesRequest) returns (google.protobuf.Empty) {}
+
+  // Revoke roles from a user.
+  rpc RevokeRoles(RevokeRolesRequest) returns (google.protobuf.Empty) {}
+
+  // List roles.
+  rpc ListRoles(google.protobuf.Empty) returns (ListRolesResponse) {}
+}

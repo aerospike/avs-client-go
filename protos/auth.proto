@@ -6,7 +6,6 @@ option go_package = "aerospike.com/vector/protos/";
 option java_package = "com.aerospike.vector.client.proto";
 option java_multiple_files = true;
 
-import "google/protobuf/empty.proto";
 import "types.proto";
 
 // An auth request to get an access token to perform operations on Aerospike
