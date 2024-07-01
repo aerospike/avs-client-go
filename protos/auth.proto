@@ -3,22 +3,26 @@ syntax = "proto3";
 package aerospike.vector;
 
 option go_package = "aerospike.com/vector/protos/";
-option java_package = "com.aerospike.vector.client";
+option java_package = "com.aerospike.vector.client.proto";
 option java_multiple_files = true;
 
-// Auth service
-service AuthService {
-  rpc Get(AerospikeAuthRequest) returns (AerospikeAuthResponse) {}
-}
+import "google/protobuf/empty.proto";
+import "types.proto";
 
 // An auth request to get an access token to perform operations on Aerospike
 // database.
-message AerospikeAuthRequest {
-  string username = 1;
-  string password = 2;
+message AuthRequest {
+  Credentials credentials = 1;
 }
 
 // An auth token to perform operations on Aerospike database.
-message AerospikeAuthResponse {
+message AuthResponse {
   string token = 1;
 }
+
+// Auth service
+service AuthService {
+  // Request authentication.
+  rpc Authenticate(AuthRequest) returns (AuthResponse) {}
+}
+

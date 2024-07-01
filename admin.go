@@ -1,11 +1,13 @@
+// Package avs provides a client for managing Aerospike Vector Indexes.
 package avs
 
 import (
 	"context"
+	"crypto/tls"
 	"log/slog"
 	"time"
 
-	"github.com/aerospike/aerospike-proximus-client-go/protos"
+	"github.com/aerospike/avs-client-go/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -15,22 +17,45 @@ const (
 	indexWaitDuration    = time.Millisecond * 100
 )
 
+// AdminClient is a client for managing Aerospike Vector Indexes.
 type AdminClient struct {
 	logger          *slog.Logger
-	channelProvider *ChannelProvider
+	channelProvider *channelProvider
 }
 
+// NewAdminClient creates a new AdminClient instance.
+//   - seeds: A list of seed hosts to connect to.
+//   - listenerName: The name of the listener to connect to as configured on the
+//     server.
+//   - isLoadBalancer: Whether the client should consider the seed a load balancer.
+//     Only the first seed is considered. Subsequent seeds are ignored.
+//   - username: The username to authenticate with.
+//   - password: The password to authenticate with.
+//   - tlsConfig: The TLS configuration to use for the connection.
+//   - logger: The logger to use for logging.
 func NewAdminClient(
 	ctx context.Context,
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
+	username *string,
+	password *string,
+	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*AdminClient, error) {
 	logger = logger.WithGroup("avs.admin")
 	logger.Debug("creating new client")
 
-	channelProvider, err := NewChannelProvider(ctx, seeds, listenerName, isLoadBalancer, logger)
+	channelProvider, err := newChannelProvider(
+		ctx,
+		seeds,
+		listenerName,
+		isLoadBalancer,
+		username,
+		password,
+		tlsConfig,
+		logger,
+	)
 	if err != nil {
 		logger.Error("failed to create channel provider", slog.Any("error", err))
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
@@ -42,11 +67,27 @@ func NewAdminClient(
 	}, nil
 }
 
+// Close closes the AdminClient and releases any resources associated with it.
 func (c *AdminClient) Close() {
 	c.logger.Info("Closing client")
 	c.channelProvider.Close()
 }
 
+// IndexCreate creates a new Aerospike Vector Index and blocks until it is created.
+// It takes the following parameters:
+//   - namespace: The namespace of the index.
+//   - sets: The sets to create the index on. Currently, only one set is supported.
+//   - name: The name of the index.
+//   - vectorField: The field to create the index on.
+//   - dimensions: The number of dimensions in the vector.
+//   - vectorDistanceMetric: The distance metric to use for the index.
+//   - indexParams: Extra options sent to the server to configure behavior of the
+//     HNSW algorithm.
+//   - indexMetaData: Extra metadata that can be attached to the index.
+//   - indexStorage: The storage configuration for the index. This allows you to
+//     configure your index and data to be stored in separate namespaces and/or sets.
+//
+// It returns an error if the index creation fails.
 func (c *AdminClient) IndexCreate(
 	ctx context.Context,
 	namespace string,
@@ -73,10 +114,13 @@ func (c *AdminClient) IndexCreate(
 
 	if len(sets) > 0 {
 		set = &sets[0]
-		logger.Warn(
-			"multiple sets not yet supported for index creation, only the first set will be used",
-			slog.String("set", *set),
-		)
+
+		if len(sets) > 1 {
+			logger.Warn(
+				"multiple sets not yet supported for index creation, only the first set will be used",
+				slog.String("set", *set),
+			)
+		}
 	}
 
 	indexDef := &protos.IndexDefinition{
@@ -109,6 +153,7 @@ func (c *AdminClient) IndexCreate(
 	return c.waitForIndexCreation(ctx, namespace, name, indexWaitDuration)
 }
 
+// IndexDrop drops an existing Aerospike Vector Index and blocks until it is.
 func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
@@ -142,6 +187,8 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 	return c.waitForIndexDrop(ctx, namespace, name, indexWaitDuration)
 }
 
+// IndexList returns a list of all Aerospike Vector Indexes. To get a single
+// index use IndexGet.
 func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -166,6 +213,8 @@ func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionLis
 	return indexList, nil
 }
 
+// IndexGet returns the definition of an Aerospike Vector Index. To get all
+// indexes use IndexList.
 func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
@@ -194,6 +243,7 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 	return indexDef, nil
 }
 
+// IndexGetStatus returns the status of an Aerospike Vector Index.
 func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
@@ -222,6 +272,8 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	return indexStatus, nil
 }
 
+// waitForIndexCreation waits for an index to be created and blocks until it is.
+// The amount of time to wait between each call is defined by waitInterval.
 func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 	namespace,
 	name string,
@@ -244,6 +296,8 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 
 	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
+
+	defer timer.Stop()
 
 	defer timer.Stop()
 
@@ -278,6 +332,8 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 	return nil
 }
 
+// waitForIndexDrop waits for an index to be dropped and blocks until it is. The
+// amount of time to wait between each call is defined by waitInterval.
 func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name string, waitInterval time.Duration) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
@@ -296,6 +352,8 @@ func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name stri
 
 	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
+
+	defer timer.Stop()
 
 	defer timer.Stop()
 

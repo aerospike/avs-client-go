@@ -3,7 +3,7 @@ syntax = "proto3";
 package aerospike.vector;
 
 option go_package = "aerospike.com/vector/protos/";
-option java_package = "com.aerospike.vector.client";
+option java_package = "com.aerospike.vector.client.proto";
 option java_multiple_files = true;
 
 import "google/protobuf/empty.proto";
@@ -22,6 +22,14 @@ enum WriteType {
   // Insert / create the record if it does not exists.
   // Fails if the record already exist.
   INSERT_ONLY = 2;
+
+  // Replace all fields in the record if it exists, else create the
+  // record if it does not exists.
+  REPLACE = 3;
+
+  // Replace all fields in the record if it exists.
+  // Fails if the record does not exist.
+  REPLACE_ONLY = 4;
 }
 
 // Put request to insert/update a record.
@@ -84,6 +92,8 @@ message ProjectionFilter {
 }
 
 // Projection to select which fields are returned.
+// A field is returned if it passes the include filter
+// and does not pass the exclude filter.
 message ProjectionSpec {
   // The fields to include.
   ProjectionFilter include = 1;
@@ -113,15 +123,21 @@ message VectorSearchRequest {
 
 // Record transaction services.
 service Transact {
+  // Update/insert records.
   rpc Put(PutRequest) returns (google.protobuf.Empty) {}
 
+  // Get a record.
   rpc Get(GetRequest) returns (Record) {}
 
+  // Delete a record.
   rpc Delete(DeleteRequest) returns (google.protobuf.Empty) {}
 
+  // Check if a record exists.
   rpc Exists(ExistsRequest) returns (Boolean) {}
 
+  // Check is a record is indexed.
   rpc IsIndexed(IsIndexedRequest) returns (Boolean) {}
 
+  // Perform a vector nearest neighbor search.
   rpc VectorSearch(VectorSearchRequest) returns (stream Neighbor) {}
 }

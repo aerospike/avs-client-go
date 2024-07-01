@@ -22,7 +22,7 @@ linters-settings:
       Main:
         allow:
           - $gostd
-          - github.com/aerospike/aerospike-proximus-client-go/protos
+          - github.com/aerospike/avs-client-go/protos
 
 linters:
   disable-all: true

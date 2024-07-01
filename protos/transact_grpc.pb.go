@@ -23,11 +23,17 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TransactClient interface {
+	// Update/insert records.
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Get a record.
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*Record, error)
+	// Delete a record.
 	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Check if a record exists.
 	Exists(ctx context.Context, in *ExistsRequest, opts ...grpc.CallOption) (*Boolean, error)
+	// Check is a record is indexed.
 	IsIndexed(ctx context.Context, in *IsIndexedRequest, opts ...grpc.CallOption) (*Boolean, error)
+	// Perform a vector nearest neighbor search.
 	VectorSearch(ctx context.Context, in *VectorSearchRequest, opts ...grpc.CallOption) (Transact_VectorSearchClient, error)
 }
 
@@ -120,11 +126,17 @@ func (x *transactVectorSearchClient) Recv() (*Neighbor, error) {
 // All implementations must embed UnimplementedTransactServer
 // for forward compatibility
 type TransactServer interface {
+	// Update/insert records.
 	Put(context.Context, *PutRequest) (*emptypb.Empty, error)
+	// Get a record.
 	Get(context.Context, *GetRequest) (*Record, error)
+	// Delete a record.
 	Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error)
+	// Check if a record exists.
 	Exists(context.Context, *ExistsRequest) (*Boolean, error)
+	// Check is a record is indexed.
 	IsIndexed(context.Context, *IsIndexedRequest) (*Boolean, error)
+	// Perform a vector nearest neighbor search.
 	VectorSearch(*VectorSearchRequest, Transact_VectorSearchServer) error
 	mustEmbedUnimplementedTransactServer()
 }
