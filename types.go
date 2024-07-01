@@ -38,16 +38,4 @@ func (hps HostPortSlice) String() string {
 	return fmt.Sprintf("[%s]", strings.Join(s, ", "))
 }
 
-type HostPortSlice []*HostPort
-
-func (hps HostPortSlice) String() string {
-	s := make([]string, len(hps))
-
-	for i, hp := range hps {
-		s[i] = hp.String()
-	}
-
-	return fmt.Sprintf("[%s]", strings.Join(s, ", "))
-}
-
 var ErrNotImplemented = errors.New("not implemented")

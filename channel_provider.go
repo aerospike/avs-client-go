@@ -34,7 +34,10 @@ func newChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEn
 	}
 }
 
-// channelProvider is responsible for managing gRPC client connections to Aerospike servers.
+// channelProvider is responsible for managing gRPC client connections to
+// Aerospike servers.
+//
+//nolint:govet // We will favor readability over field alignment
 type channelProvider struct {
 	logger         *slog.Logger
 	nodeConns      map[uint64]*channelAndEndpoints
@@ -69,16 +72,19 @@ func newChannelProvider(
 	if len(seeds) == 0 {
 		msg := "seeds cannot be nil or empty"
 		logger.Error(msg)
+
 		return nil, errors.New(msg)
 	}
 
 	// Create a token manager if username and password are provided.
 	var token *tokenManager
+
 	if username != nil || password != nil {
 		if username == nil || password == nil {
 			// Either both are set or neither are set
 			msg := "username and password must both be set"
 			logger.Error(msg)
+
 			return nil, errors.New(msg)
 		}
 
@@ -87,6 +93,7 @@ func newChannelProvider(
 		if token.RequireTransportSecurity() && tlsConfig == nil {
 			msg := "tlsConfig is required when username/password authentication"
 			logger.Error(msg)
+
 			return nil, errors.New(msg)
 		}
 	}
@@ -120,7 +127,8 @@ func newChannelProvider(
 	// Start the tend routine if load balancing is disabled.
 	if !isLoadBalancer {
 		cp.logger.Debug("starting tend routine")
-		cp.updateClusterChannels(ctx)    // We want at least one tend to occur before we return
+		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
+
 		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
@@ -212,6 +220,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) != 0 {
 		msg := "seed channels already exist, close them first"
 		cp.logger.Error(msg)
+
 		return errors.New(msg)
 	}
 
@@ -228,9 +237,10 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 
 		go func(seed *HostPort) {
 			defer wg.Done()
+
 			logger := cp.logger.With(slog.String("host", seed.String()))
 
-			conn, err := createChannel(ctx, seed)
+			conn, err := cp.createChannel(seed)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create channel", slog.Any("error", err))
 				return
@@ -248,13 +258,13 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
 						tokenLock.Unlock()
+
 						return
 					}
 
 					// No need to check this conn again for successful connectivity
 					extraCheck = false
 					tokenUpdated = true
-
 				}
 				tokenLock.Unlock()
 			}
