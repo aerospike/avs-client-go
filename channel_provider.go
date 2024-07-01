@@ -76,6 +76,7 @@ func newChannelProvider(
 	var token *tokenManager
 	if username != nil || password != nil {
 		if username == nil || password == nil {
+			// Either both are set or neither are set
 			msg := "username and password must both be set"
 			logger.Error(msg)
 			return nil, errors.New(msg)
@@ -243,7 +244,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 				// succeed others will block
 				tokenLock.Lock()
 				if !tokenUpdated {
-					updated, err := cp.token.RefreshToken(ctx, conn)
+					err := cp.token.RefreshToken(ctx, conn)
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
@@ -251,10 +252,9 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 					}
 
 					// No need to check this conn again for successful connectivity
-					if updated {
-						extraCheck = false
-						tokenUpdated = true
-					}
+					extraCheck = false
+					tokenUpdated = true
+
 				}
 				tokenLock.Unlock()
 			}
@@ -442,7 +442,7 @@ func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 }
 
 // removeDownNodes removes the gRPC client connections for nodes in nodeConns
-// that arn't apart of newNodeEndpoints
+// that aren't apart of newNodeEndpoints
 func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	cp.nodeConnsLock.Lock()
 	defer cp.nodeConnsLock.Unlock()

@@ -72,7 +72,7 @@ func (tm *tokenManager) expired() bool {
 // RefreshToken refreshes the authentication token using the provided gRPC client connection.
 // It returns a boolean indicating if the token was successfully refreshed and
 // an error if any. It is not thread safe.
-func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnInterface) (bool, error) {
+func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnInterface) error {
 	// We only want one goroutine to refresh the token at a time
 	client := protos.NewAuthServiceClient(conn)
 	resp, err := client.Authenticate(ctx, &protos.AuthRequest{
@@ -87,36 +87,36 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	})
 
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	claims := strings.Split(resp.GetToken(), ".")
 	decClaims, err := base64.RawURLEncoding.DecodeString(claims[1])
 
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
-	tokenMap := make(map[string]interface{}, 8)
+	tokenMap := make(map[string]any, 8)
 	err = json.Unmarshal(decClaims, &tokenMap)
 
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	expiryToken, ok := tokenMap["exp"].(float64)
 	if !ok {
-		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	iat, ok := tokenMap["iat"].(float64)
 	if !ok {
-		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	ttl := time.Duration(expiryToken-iat) * time.Second
 	if ttl <= 0 {
-		return false, fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("%s: %w", "failed to authenticate", err)
 	}
 
 	tm.logger.DebugContext(
@@ -131,7 +131,7 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	tm.setRefreshTimeFromTTL(ttl)
 	tm.token.Store("Bearer " + resp.GetToken())
 
-	return true, nil
+	return nil
 }
 
 // ScheduleRefresh schedules the token refresh using the provided function to
@@ -139,7 +139,7 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 // called once.
 func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)) {
 	if tm.refreshScheduled {
-		tm.logger.WarnContext(context.Background(), "refresh already scheduled")
+		tm.logger.Warn("refresh already scheduled")
 	}
 
 	tm.logger.Debug("scheduling token refresh")
@@ -151,14 +151,14 @@ func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)
 		for {
 			conn, err := getConn()
 			if err != nil {
-				tm.logger.WarnContext(context.Background(), "failed to refresh token", slog.Any("error", err))
+				tm.logger.Warn("failed to refresh token", slog.Any("error", err))
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-			_, err = tm.RefreshToken(ctx, conn)
+			err = tm.RefreshToken(ctx, conn)
 			if err != nil {
-				tm.logger.WarnContext(context.Background(), "failed to refresh token", slog.Any("error", err))
+				tm.logger.Warn("failed to refresh token", slog.Any("error", err))
 			}
 
 			cancel()
