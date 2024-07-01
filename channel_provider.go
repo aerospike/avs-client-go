@@ -247,6 +247,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
+						tokenLock.Unlock()
 						return
 					}
 
