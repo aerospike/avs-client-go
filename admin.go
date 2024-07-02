@@ -10,6 +10,7 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -101,6 +102,7 @@ func (c *AdminClient) IndexCreate(
 	indexStorage *protos.IndexStorage,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "creating index")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -156,6 +158,7 @@ func (c *AdminClient) IndexCreate(
 // IndexDrop drops an existing Aerospike Vector Index and blocks until it is.
 func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "dropping index")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -190,6 +193,8 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 // IndexList returns a list of all Aerospike Vector Indexes. To get a single
 // index use IndexGet.
 func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
+	c.logger.InfoContext(ctx, "listing indexes")
+
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to get indexes"
@@ -217,11 +222,12 @@ func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionLis
 // indexes use IndexList.
 func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "getting index")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to get index"
-		logger.Error(msg, slog.Any("error", err))
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
@@ -235,7 +241,7 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 	indexDef, err := client.Get(ctx, indexID)
 	if err != nil {
 		msg := "failed to get index"
-		logger.Error(msg, slog.Any("error", err))
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
@@ -246,11 +252,12 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 // IndexGetStatus returns the status of an Aerospike Vector Index.
 func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "getting index status")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to get index status"
-		logger.Error(msg, slog.Any("error", err))
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
@@ -264,12 +271,245 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	indexStatus, err := client.GetStatus(ctx, indexID)
 	if err != nil {
 		msg := "failed to get index status"
-		logger.Error(msg, slog.Any("error", err))
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
 	return indexStatus, nil
+}
+
+// CreateUser creates a new user with the provided username, password, and roles.
+func (c *AdminClient) CreateUser(ctx context.Context, username, password string, roles []string) error {
+	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
+	logger.InfoContext(ctx, "creating user")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to create user"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	addUserRequest := &protos.AddUserRequest{
+		Credentials: createUserPassCredential(username, password),
+		Roles:       roles,
+	}
+
+	_, err = client.AddUser(ctx, addUserRequest)
+	if err != nil {
+		msg := "failed to create user"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
+}
+
+// UpdateCredentials updates the password for the provided username.
+func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password string) error {
+	logger := c.logger.With(slog.String("username", username))
+	logger.InfoContext(ctx, "updating user credentials")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to update user credentials"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	updatedCredRequest := &protos.UpdateCredentialsRequest{
+		Credentials: createUserPassCredential(username, password),
+	}
+
+	_, err = client.UpdateCredentials(ctx, updatedCredRequest)
+	if err != nil {
+		msg := "failed to update user credentials"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
+}
+
+// DropUser deletes the user with the provided username.
+func (c *AdminClient) DropUser(ctx context.Context, username string) error {
+	logger := c.logger.With(slog.String("username", username))
+	logger.InfoContext(ctx, "dropping user")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to drop user"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	dropUserRequest := &protos.DropUserRequest{
+		Username: username,
+	}
+
+	_, err = client.DropUser(ctx, dropUserRequest)
+	if err != nil {
+		msg := "failed to drop user"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
+}
+
+// GetUser returns the user with the provided username.
+func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.User, error) {
+	logger := c.logger.With(slog.String("username", username))
+	logger.InfoContext(ctx, "getting user")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to get user"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	getUserRequest := &protos.GetUserRequest{
+		Username: username,
+	}
+
+	userResp, err := client.GetUser(ctx, getUserRequest)
+	if err != nil {
+		msg := "failed to get user"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return userResp, nil
+}
+
+// ListUsers returns a list of all users.
+func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
+	c.logger.InfoContext(ctx, "listing users")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to list users"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	usersResp, err := client.ListUsers(ctx, &emptypb.Empty{})
+	if err != nil {
+		msg := "failed to lists users"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return usersResp, nil
+}
+
+// GrantRoles grants the provided roles to the user with the provided username.
+func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []string) error {
+	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
+	logger.InfoContext(ctx, "granting user roles")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to grant user roles"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	grantRolesRequest := &protos.GrantRolesRequest{
+		Username: username,
+		Roles:    roles,
+	}
+
+	_, err = client.GrantRoles(ctx, grantRolesRequest)
+	if err != nil {
+		msg := "failed to grant user roles"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
+}
+
+// RevokeRoles revokes the provided roles from the user with the provided username.
+func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []string) error {
+	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
+	logger.InfoContext(ctx, "revoking user roles")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to revoke user roles"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	revokeRolesReq := &protos.RevokeRolesRequest{
+		Username: username,
+		Roles:    roles,
+	}
+
+	_, err = client.RevokeRoles(ctx, revokeRolesReq)
+	if err != nil {
+		msg := "failed to revoke user roles"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
+}
+
+// ListRoles returns a list of all roles.
+func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
+	c.logger.InfoContext(ctx, "listing roles")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to list roles"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewUserAdminServiceClient(conn)
+
+	rolesResp, err := client.ListRoles(ctx, &emptypb.Empty{})
+	if err != nil {
+		msg := "failed to lists roles"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return rolesResp, nil
 }
 
 // waitForIndexCreation waits for an index to be created and blocks until it is.

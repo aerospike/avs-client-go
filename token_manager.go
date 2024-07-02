@@ -76,14 +76,7 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	// We only want one goroutine to refresh the token at a time
 	client := protos.NewAuthServiceClient(conn)
 	resp, err := client.Authenticate(ctx, &protos.AuthRequest{
-		Credentials: &protos.Credentials{
-			Username: tm.username,
-			Credentials: &protos.Credentials_PasswordCredentials{
-				PasswordCredentials: &protos.PasswordCredentials{
-					Password: tm.password,
-				},
-			},
-		},
+		Credentials: createUserPassCredential(tm.username, tm.password),
 	})
 
 	if err != nil {
