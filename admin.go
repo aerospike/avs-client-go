@@ -273,8 +273,7 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	return indexStatus, nil
 }
 
-// def CreateUser(self, *, username: str, password: str, roles: list[str]) ->
-// int:
+// CreateUser creates a new user with the provided username, password, and roles.
 func (c *AdminClient) CreateUser(ctx context.Context, username, password string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 
@@ -304,7 +303,7 @@ func (c *AdminClient) CreateUser(ctx context.Context, username, password string,
 	return nil
 }
 
-// def UpdateCredentials(self, *, username: str, password: str) -> int:
+// UpdateCredentials updates the password for the provided username.
 func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password string) error {
 	logger := c.logger.With(slog.String("username", username))
 
@@ -333,7 +332,7 @@ func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password 
 	return nil
 }
 
-// def DropUser(self, *, username: str) -> int:
+// DropUser deletes the user with the provided username.
 func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
 
@@ -362,7 +361,7 @@ func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 	return nil
 }
 
-// def GetUser(self, *, username: str) -> int:
+// GetUser returns the user with the provided username.
 func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.User, error) {
 	logger := c.logger.With(slog.String("username", username))
 
@@ -391,7 +390,7 @@ func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.Use
 	return userResp, nil
 }
 
-// def ListUsers(self) -> int:
+// ListUsers returns a list of all users.
 func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -414,7 +413,7 @@ func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse,
 	return usersResp, nil
 }
 
-// def GrantRoles(self, *, username: str, roles: list[str]) -> int:
+// GrantRoles grants the provided roles to the user with the provided username.
 func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 
@@ -444,7 +443,7 @@ func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []s
 	return nil
 }
 
-// def RevokeRoles(self, *, username: str, roles: list[str]) -> int:
+// RevokeRoles revokes the provided roles from the user with the provided username.
 func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 
@@ -474,7 +473,7 @@ func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []
 	return nil
 }
 
-// def ListRoles(self) -> int:
+// ListRoles returns a list of all roles.
 func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
