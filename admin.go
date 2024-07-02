@@ -102,6 +102,7 @@ func (c *AdminClient) IndexCreate(
 	indexStorage *protos.IndexStorage,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "creating index")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -157,6 +158,7 @@ func (c *AdminClient) IndexCreate(
 // IndexDrop drops an existing Aerospike Vector Index and blocks until it is.
 func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "dropping index")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -191,6 +193,8 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 // IndexList returns a list of all Aerospike Vector Indexes. To get a single
 // index use IndexGet.
 func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
+	c.logger.InfoContext(ctx, "listing indexes")
+
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to get indexes"
@@ -218,6 +222,7 @@ func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionLis
 // indexes use IndexList.
 func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "getting index")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -247,6 +252,7 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 // IndexGetStatus returns the status of an Aerospike Vector Index.
 func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger.InfoContext(ctx, "getting index status")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -276,6 +282,7 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 // CreateUser creates a new user with the provided username, password, and roles.
 func (c *AdminClient) CreateUser(ctx context.Context, username, password string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
+	logger.InfoContext(ctx, "creating user")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -306,6 +313,7 @@ func (c *AdminClient) CreateUser(ctx context.Context, username, password string,
 // UpdateCredentials updates the password for the provided username.
 func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password string) error {
 	logger := c.logger.With(slog.String("username", username))
+	logger.InfoContext(ctx, "updating user credentials")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -335,6 +343,7 @@ func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password 
 // DropUser deletes the user with the provided username.
 func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
+	logger.InfoContext(ctx, "dropping user")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -364,6 +373,7 @@ func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 // GetUser returns the user with the provided username.
 func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.User, error) {
 	logger := c.logger.With(slog.String("username", username))
+	logger.InfoContext(ctx, "getting user")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -392,6 +402,8 @@ func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.Use
 
 // ListUsers returns a list of all users.
 func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
+	c.logger.InfoContext(ctx, "listing users")
+
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to list users"
@@ -416,6 +428,7 @@ func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse,
 // GrantRoles grants the provided roles to the user with the provided username.
 func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
+	logger.InfoContext(ctx, "granting user roles")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -446,6 +459,7 @@ func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []s
 // RevokeRoles revokes the provided roles from the user with the provided username.
 func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
+	logger.InfoContext(ctx, "revoking user roles")
 
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
@@ -475,6 +489,8 @@ func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []
 
 // ListRoles returns a list of all roles.
 func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
+	c.logger.InfoContext(ctx, "listing roles")
+
 	conn, err := c.channelProvider.GetConn()
 	if err != nil {
 		msg := "failed to list roles"
