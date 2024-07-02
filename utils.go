@@ -11,5 +11,4 @@ func createUserPassCredential(username, password string) *protos.Credentials {
 			},
 		},
 	}
-
 }
