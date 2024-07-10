@@ -186,14 +186,75 @@ message HnswParams {
 
   // Configures batching behaviour for batch based index update.
   HnswBatchingParams batchingParams = 4;
+
+  // Maximum size of in-memory queue for inserted/updated vector records.
+  // If the queue is full the record upsert will either be rejected with
+  // a RESOURCE_EXHAUSTED error or written to storage for index healer to
+  // later pick the record for indexing based on the put option.
+  // Defaults to global indexing config configured for the VectorDB.
+  optional uint32 maxMemQueueSize = 5;
+
+  // Configures caching for Hnsw Index.
+  HnswCachingParams cachingParams = 6;
+
+  // Configures index healer params.
+  HnswHealerParams healerParams = 7;
+
+  // Configures merge of batch indices to main index.
+  HnswIndexMergeParams mergeParams = 8;
 }
 
-// Params for the HNSW index search
+// Params for the HNSW index search.
 message HnswSearchParams {
   // The default number of candidate nearest neighbors shortlisted during search.
   // Larger values provide better recall at the cost of longer search times.
   // The default is value set in HnswParams for the index.
   optional uint32 ef = 1;
+}
+
+// Params to configure Hnsw batch index into main index.
+message HnswIndexMergeParams {
+  // The number of vectors merged in parallel from a batch index to main index.
+  // Defaults to global indexing config configured for the VectorDB.
+  optional uint32  parallelism = 1;
+}
+
+// Params to configure Hnsw index cache
+message HnswCachingParams {
+  // Maximum number of entries to cache.
+  // Defaults to the global cache config configured for the VectorDB.
+  optional uint64 maxEntries = 1;
+
+  // A cache entry will expire after this time in milliseconds has
+  // expired after the entry was added to cache.
+  // Defaults to the global cache config configured for the VectorDB.
+  optional uint64 expiry = 2;
+}
+
+// Params to configure Hnsw index cache
+message HnswHealerParams {
+  // Maximum allowed record scan rate per vector db node.
+  // Defaults to the global healer config configured for the VectorDB.
+  optional uint32 maxScanRatePerNode = 1;
+
+  // Maximum number of records in a single scanned page.
+  // Defaults to the global healer config configured for the VectorDB.
+  optional uint32 maxScanPageSize = 2;
+
+  // Percentage of good records randomly selected for reindexing in a healer cycle.
+  // Defaults to the global healer config configured for the VectorDB.
+  optional float reindexPercent = 3;
+
+  // The time delay, in milliseconds, between the termination of a healer run
+  // and the commencement of the next one for an index. It only guarantees
+  // that the next index healer run for an index will not be scheduled before
+  // this time delay.
+  // Defaults to the global healer config configured for the VectorDB.
+  optional uint64 scheduleDelay = 4;
+
+  // Maximum number of records to heal in parallel.
+  // Defaults to the global healer config configured for the VectorDB.
+  optional uint32 parallelism = 5;
 }
 
 // Configures batching behaviour for batch based index update.
@@ -205,10 +266,28 @@ message HnswBatchingParams {
   // The maximum amount of time in milliseconds to wait before finalizing a batch.
   // The default value is 10000.
   optional uint32 interval = 2;
+}
 
-  // Disables batching for index updates.
-  // Default is false meaning batching is enabled.
-  optional bool disabled = 3;
+// Message to update a HNSW index parameters.
+message HnswIndexUpdate {
+  // Configures batching behaviour for batch based index update.
+  optional HnswBatchingParams batchingParams = 1;
+
+  // Maximum size of in-memory queue for inserted/updated vector records.
+  // If the queue is full the record upsert will either be rejected with
+  // a RESOURCE_EXHAUSTED error or written to storage for index healer to
+  // later pick the record for indexing based on the put option.
+  // Defaults to global indexing config configured for the VectorDB.
+  optional uint32 maxMemQueueSize = 2;
+
+  // Configures caching for Hnsw Index.
+  optional HnswCachingParams cachingParams = 3;
+
+  // Configures index healer params.
+  optional HnswHealerParams healerParams = 4;
+
+  // Configures merge of batch indices to main index.
+  optional HnswIndexMergeParams mergeParams = 5;
 }
 
 // Index storage configuration

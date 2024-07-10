@@ -19,10 +19,10 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// TransactClient is the client API for Transact service.
+// TransactServiceClient is the client API for TransactService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type TransactClient interface {
+type TransactServiceClient interface {
 	// Update/insert records.
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get a record.
@@ -34,68 +34,68 @@ type TransactClient interface {
 	// Check is a record is indexed.
 	IsIndexed(ctx context.Context, in *IsIndexedRequest, opts ...grpc.CallOption) (*Boolean, error)
 	// Perform a vector nearest neighbor search.
-	VectorSearch(ctx context.Context, in *VectorSearchRequest, opts ...grpc.CallOption) (Transact_VectorSearchClient, error)
+	VectorSearch(ctx context.Context, in *VectorSearchRequest, opts ...grpc.CallOption) (TransactService_VectorSearchClient, error)
 }
 
-type transactClient struct {
+type transactServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewTransactClient(cc grpc.ClientConnInterface) TransactClient {
-	return &transactClient{cc}
+func NewTransactServiceClient(cc grpc.ClientConnInterface) TransactServiceClient {
+	return &transactServiceClient{cc}
 }
 
-func (c *transactClient) Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *transactServiceClient) Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.Transact/Put", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.TransactService/Put", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *transactClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*Record, error) {
+func (c *transactServiceClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*Record, error) {
 	out := new(Record)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.Transact/Get", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.TransactService/Get", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *transactClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *transactServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.Transact/Delete", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.TransactService/Delete", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *transactClient) Exists(ctx context.Context, in *ExistsRequest, opts ...grpc.CallOption) (*Boolean, error) {
+func (c *transactServiceClient) Exists(ctx context.Context, in *ExistsRequest, opts ...grpc.CallOption) (*Boolean, error) {
 	out := new(Boolean)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.Transact/Exists", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.TransactService/Exists", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *transactClient) IsIndexed(ctx context.Context, in *IsIndexedRequest, opts ...grpc.CallOption) (*Boolean, error) {
+func (c *transactServiceClient) IsIndexed(ctx context.Context, in *IsIndexedRequest, opts ...grpc.CallOption) (*Boolean, error) {
 	out := new(Boolean)
-	err := c.cc.Invoke(ctx, "/aerospike.vector.Transact/IsIndexed", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.TransactService/IsIndexed", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *transactClient) VectorSearch(ctx context.Context, in *VectorSearchRequest, opts ...grpc.CallOption) (Transact_VectorSearchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Transact_ServiceDesc.Streams[0], "/aerospike.vector.Transact/VectorSearch", opts...)
+func (c *transactServiceClient) VectorSearch(ctx context.Context, in *VectorSearchRequest, opts ...grpc.CallOption) (TransactService_VectorSearchClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TransactService_ServiceDesc.Streams[0], "/aerospike.vector.TransactService/VectorSearch", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &transactVectorSearchClient{stream}
+	x := &transactServiceVectorSearchClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -105,16 +105,16 @@ func (c *transactClient) VectorSearch(ctx context.Context, in *VectorSearchReque
 	return x, nil
 }
 
-type Transact_VectorSearchClient interface {
+type TransactService_VectorSearchClient interface {
 	Recv() (*Neighbor, error)
 	grpc.ClientStream
 }
 
-type transactVectorSearchClient struct {
+type transactServiceVectorSearchClient struct {
 	grpc.ClientStream
 }
 
-func (x *transactVectorSearchClient) Recv() (*Neighbor, error) {
+func (x *transactServiceVectorSearchClient) Recv() (*Neighbor, error) {
 	m := new(Neighbor)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -122,10 +122,10 @@ func (x *transactVectorSearchClient) Recv() (*Neighbor, error) {
 	return m, nil
 }
 
-// TransactServer is the server API for Transact service.
-// All implementations must embed UnimplementedTransactServer
+// TransactServiceServer is the server API for TransactService service.
+// All implementations must embed UnimplementedTransactServiceServer
 // for forward compatibility
-type TransactServer interface {
+type TransactServiceServer interface {
 	// Update/insert records.
 	Put(context.Context, *PutRequest) (*emptypb.Empty, error)
 	// Get a record.
@@ -137,188 +137,188 @@ type TransactServer interface {
 	// Check is a record is indexed.
 	IsIndexed(context.Context, *IsIndexedRequest) (*Boolean, error)
 	// Perform a vector nearest neighbor search.
-	VectorSearch(*VectorSearchRequest, Transact_VectorSearchServer) error
-	mustEmbedUnimplementedTransactServer()
+	VectorSearch(*VectorSearchRequest, TransactService_VectorSearchServer) error
+	mustEmbedUnimplementedTransactServiceServer()
 }
 
-// UnimplementedTransactServer must be embedded to have forward compatible implementations.
-type UnimplementedTransactServer struct {
+// UnimplementedTransactServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedTransactServiceServer struct {
 }
 
-func (UnimplementedTransactServer) Put(context.Context, *PutRequest) (*emptypb.Empty, error) {
+func (UnimplementedTransactServiceServer) Put(context.Context, *PutRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
 }
-func (UnimplementedTransactServer) Get(context.Context, *GetRequest) (*Record, error) {
+func (UnimplementedTransactServiceServer) Get(context.Context, *GetRequest) (*Record, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
-func (UnimplementedTransactServer) Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error) {
+func (UnimplementedTransactServiceServer) Delete(context.Context, *DeleteRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
-func (UnimplementedTransactServer) Exists(context.Context, *ExistsRequest) (*Boolean, error) {
+func (UnimplementedTransactServiceServer) Exists(context.Context, *ExistsRequest) (*Boolean, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Exists not implemented")
 }
-func (UnimplementedTransactServer) IsIndexed(context.Context, *IsIndexedRequest) (*Boolean, error) {
+func (UnimplementedTransactServiceServer) IsIndexed(context.Context, *IsIndexedRequest) (*Boolean, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IsIndexed not implemented")
 }
-func (UnimplementedTransactServer) VectorSearch(*VectorSearchRequest, Transact_VectorSearchServer) error {
+func (UnimplementedTransactServiceServer) VectorSearch(*VectorSearchRequest, TransactService_VectorSearchServer) error {
 	return status.Errorf(codes.Unimplemented, "method VectorSearch not implemented")
 }
-func (UnimplementedTransactServer) mustEmbedUnimplementedTransactServer() {}
+func (UnimplementedTransactServiceServer) mustEmbedUnimplementedTransactServiceServer() {}
 
-// UnsafeTransactServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to TransactServer will
+// UnsafeTransactServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to TransactServiceServer will
 // result in compilation errors.
-type UnsafeTransactServer interface {
-	mustEmbedUnimplementedTransactServer()
+type UnsafeTransactServiceServer interface {
+	mustEmbedUnimplementedTransactServiceServer()
 }
 
-func RegisterTransactServer(s grpc.ServiceRegistrar, srv TransactServer) {
-	s.RegisterService(&Transact_ServiceDesc, srv)
+func RegisterTransactServiceServer(s grpc.ServiceRegistrar, srv TransactServiceServer) {
+	s.RegisterService(&TransactService_ServiceDesc, srv)
 }
 
-func _Transact_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TransactService_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PutRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TransactServer).Put(ctx, in)
+		return srv.(TransactServiceServer).Put(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/aerospike.vector.Transact/Put",
+		FullMethod: "/aerospike.vector.TransactService/Put",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TransactServer).Put(ctx, req.(*PutRequest))
+		return srv.(TransactServiceServer).Put(ctx, req.(*PutRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Transact_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TransactService_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TransactServer).Get(ctx, in)
+		return srv.(TransactServiceServer).Get(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/aerospike.vector.Transact/Get",
+		FullMethod: "/aerospike.vector.TransactService/Get",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TransactServer).Get(ctx, req.(*GetRequest))
+		return srv.(TransactServiceServer).Get(ctx, req.(*GetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Transact_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TransactService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TransactServer).Delete(ctx, in)
+		return srv.(TransactServiceServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/aerospike.vector.Transact/Delete",
+		FullMethod: "/aerospike.vector.TransactService/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TransactServer).Delete(ctx, req.(*DeleteRequest))
+		return srv.(TransactServiceServer).Delete(ctx, req.(*DeleteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Transact_Exists_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TransactService_Exists_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ExistsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TransactServer).Exists(ctx, in)
+		return srv.(TransactServiceServer).Exists(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/aerospike.vector.Transact/Exists",
+		FullMethod: "/aerospike.vector.TransactService/Exists",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TransactServer).Exists(ctx, req.(*ExistsRequest))
+		return srv.(TransactServiceServer).Exists(ctx, req.(*ExistsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Transact_IsIndexed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TransactService_IsIndexed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IsIndexedRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TransactServer).IsIndexed(ctx, in)
+		return srv.(TransactServiceServer).IsIndexed(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/aerospike.vector.Transact/IsIndexed",
+		FullMethod: "/aerospike.vector.TransactService/IsIndexed",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TransactServer).IsIndexed(ctx, req.(*IsIndexedRequest))
+		return srv.(TransactServiceServer).IsIndexed(ctx, req.(*IsIndexedRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Transact_VectorSearch_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _TransactService_VectorSearch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(VectorSearchRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(TransactServer).VectorSearch(m, &transactVectorSearchServer{stream})
+	return srv.(TransactServiceServer).VectorSearch(m, &transactServiceVectorSearchServer{stream})
 }
 
-type Transact_VectorSearchServer interface {
+type TransactService_VectorSearchServer interface {
 	Send(*Neighbor) error
 	grpc.ServerStream
 }
 
-type transactVectorSearchServer struct {
+type transactServiceVectorSearchServer struct {
 	grpc.ServerStream
 }
 
-func (x *transactVectorSearchServer) Send(m *Neighbor) error {
+func (x *transactServiceVectorSearchServer) Send(m *Neighbor) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-// Transact_ServiceDesc is the grpc.ServiceDesc for Transact service.
+// TransactService_ServiceDesc is the grpc.ServiceDesc for TransactService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Transact_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "aerospike.vector.Transact",
-	HandlerType: (*TransactServer)(nil),
+var TransactService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "aerospike.vector.TransactService",
+	HandlerType: (*TransactServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Put",
-			Handler:    _Transact_Put_Handler,
+			Handler:    _TransactService_Put_Handler,
 		},
 		{
 			MethodName: "Get",
-			Handler:    _Transact_Get_Handler,
+			Handler:    _TransactService_Get_Handler,
 		},
 		{
 			MethodName: "Delete",
-			Handler:    _Transact_Delete_Handler,
+			Handler:    _TransactService_Delete_Handler,
 		},
 		{
 			MethodName: "Exists",
-			Handler:    _Transact_Exists_Handler,
+			Handler:    _TransactService_Exists_Handler,
 		},
 		{
 			MethodName: "IsIndexed",
-			Handler:    _Transact_IsIndexed_Handler,
+			Handler:    _TransactService_IsIndexed_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "VectorSearch",
-			Handler:       _Transact_VectorSearch_Handler,
+			Handler:       _TransactService_VectorSearch_Handler,
 			ServerStreams: true,
 		},
 	},

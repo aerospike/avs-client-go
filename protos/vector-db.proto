@@ -15,7 +15,7 @@ message AboutRequest {
 
 // The about response message.
 message AboutResponse {
-  // Proximus server version.
+  // AVS server version.
   string version = 1;
 }
 
@@ -72,12 +72,12 @@ message ClusteringState {
 }
 
 // Information about the service.
-service About {
+service AboutService {
   rpc Get (AboutRequest) returns (AboutResponse) {}
 }
 
 // Vector DB cluster service.
-service ClusterInfo {
+service ClusterInfoService {
   // Get the internal cluster node-Id for this server.
   rpc GetNodeId(google.protobuf.Empty) returns (NodeId) {}
 
