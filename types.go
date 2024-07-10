@@ -43,7 +43,7 @@ type UserPassCredentials struct {
 	password string
 }
 
-func NewCredntialsFromUserPass(username string, password string) *UserPassCredentials {
+func NewCredntialsFromUserPass(username, password string) *UserPassCredentials {
 	return &UserPassCredentials{
 		username: username,
 		password: password,

@@ -15,7 +15,7 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	grpcCreds "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -581,7 +581,7 @@ func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, 
 	} else {
 		cp.logger.Debug("using secure tls connection to host", slog.String("host", hostPort.String()))
 
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(cp.tlsConfig)))
+		opts = append(opts, grpc.WithTransportCredentials(grpcCreds.NewTLS(cp.tlsConfig)))
 	}
 
 	if cp.token != nil {

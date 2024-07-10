@@ -80,10 +80,10 @@ func (c *AdminClient) Close() {
 //   - HNSWParams: Extra options sent to the server to configure behavior of the
 //     HNSW algorithm.
 type IndexCreateOpts struct {
-	Sets       []string
-	MetaData   map[string]string
 	Storage    *protos.IndexStorage
 	HnswParams *protos.HnswParams
+	MetaData   map[string]string
+	Sets       []string
 }
 
 // IndexCreate creates a new Aerospike Vector Index and blocks until it is created.
@@ -328,8 +328,12 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	return indexStatus, nil
 }
 
-func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace string, name string, cutoffTime time.Time) error {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name), slog.Any("cutoffTime", cutoffTime))
+func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.String("name", name),
+		slog.Any("cutoffTime", cutoffTime),
+	)
 
 	logger.InfoContext(ctx, "garbage collection invalid vertices")
 
