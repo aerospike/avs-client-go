@@ -328,6 +328,7 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	return indexStatus, nil
 }
 
+// GcInvalidVertices garbage collects invalid vertices in an Aerospike Vector Index.
 func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
