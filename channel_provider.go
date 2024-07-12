@@ -15,7 +15,7 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	grpcCreds "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -60,8 +60,7 @@ func newChannelProvider(
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
-	username *string,
-	password *string,
+	credentials *UserPassCredentials,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*channelProvider, error) {
@@ -79,16 +78,8 @@ func newChannelProvider(
 	// Create a token manager if username and password are provided.
 	var token *tokenManager
 
-	if username != nil || password != nil {
-		if username == nil || password == nil {
-			// Either both are set or neither are set
-			msg := "username and password must both be set"
-			logger.Error(msg)
-
-			return nil, errors.New(msg)
-		}
-
-		token = newJWTToken(*username, *password, logger)
+	if credentials != nil {
+		token = newJWTToken(credentials.username, credentials.password, logger)
 
 		if token.RequireTransportSecurity() && tlsConfig == nil {
 			msg := "tlsConfig is required when username/password authentication"
@@ -271,7 +262,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 
 			// TODO: Check compatible client/server version here
 			if extraCheck {
-				client := protos.NewClusterInfoClient(conn)
+				client := protos.NewClusterInfoServiceClient(conn)
 
 				_, err = client.GetClusterId(ctx, &emptypb.Empty{})
 				if err != nil {
@@ -372,7 +363,7 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 			defer wg.Done()
 
 			logger := cp.logger.With(slog.String("host", conn.Target()))
-			client := protos.NewClusterInfoClient(conn)
+			client := protos.NewClusterInfoServiceClient(conn)
 
 			clusterID, err := client.GetClusterId(ctx, &emptypb.Empty{})
 			if err != nil {
@@ -590,7 +581,7 @@ func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, 
 	} else {
 		cp.logger.Debug("using secure tls connection to host", slog.String("host", hostPort.String()))
 
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(cp.tlsConfig)))
+		opts = append(opts, grpc.WithTransportCredentials(grpcCreds.NewTLS(cp.tlsConfig)))
 	}
 
 	if cp.token != nil {

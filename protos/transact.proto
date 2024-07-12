@@ -42,6 +42,10 @@ message PutRequest {
 
   // The record fields.
   repeated Field fields = 3;
+
+  // Ignore the in-memory queue full error. These records would be written to
+  // storage and later, the index healer would pick for indexing.
+  bool ignoreMemQueueFull = 4;
 }
 
 // Get request to insert/update a record.
@@ -50,7 +54,7 @@ message GetRequest {
   Key key = 1;
 
   // The field selector.
-  ProjectionSpec projectionSpec = 2;
+  ProjectionSpec projection = 2;
 }
 
 // Check if a record exists.
@@ -122,7 +126,7 @@ message VectorSearchRequest {
 }
 
 // Record transaction services.
-service Transact {
+service TransactService {
   // Update/insert records.
   rpc Put(PutRequest) returns (google.protobuf.Empty) {}
 

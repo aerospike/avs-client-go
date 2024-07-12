@@ -14,10 +14,31 @@ message IndexStatusResponse {
   int64 unmergedRecordCount = 2;
 }
 
+message GcInvalidVerticesRequest {
+  IndexId indexId = 1;
+
+  // Vertices identified as invalid before cutoff timestamp (Unix timestamp) are garbage collected.
+  int64 cutoffTimestamp = 2;
+}
+
+message IndexUpdateRequest {
+  IndexId  indexId = 1;
+
+  // Optional labels associated with the index.
+  map<string, string> labels = 2;
+
+  oneof update {
+    HnswIndexUpdate hnswIndexUpdate = 3;
+  }
+}
+
 // Service to manage indices.
 service IndexService {
   // Create an index.
   rpc Create(IndexDefinition) returns (google.protobuf.Empty) {}
+
+  // Create an index.
+  rpc Update(IndexUpdateRequest) returns (google.protobuf.Empty) {}
 
   // Drop an index.
   rpc Drop(IndexId) returns (google.protobuf.Empty) {}
@@ -31,4 +52,7 @@ service IndexService {
   // Query status of an index.
   // NOTE: API is subject to change.
   rpc GetStatus(IndexId) returns (IndexStatusResponse) {}
+
+  // Garbage collect vertices identified as invalid before cutoff timestamp.
+  rpc GcInvalidVertices(GcInvalidVerticesRequest) returns (google.protobuf.Empty) {}
 }

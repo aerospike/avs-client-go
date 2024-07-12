@@ -39,8 +39,7 @@ func NewAdminClient(
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
-	username *string,
-	password *string,
+	credentials *UserPassCredentials,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*AdminClient, error) {
@@ -52,8 +51,7 @@ func NewAdminClient(
 		seeds,
 		listenerName,
 		isLoadBalancer,
-		username,
-		password,
+		credentials,
 		tlsConfig,
 		logger,
 	)
@@ -74,32 +72,38 @@ func (c *AdminClient) Close() {
 	c.channelProvider.Close()
 }
 
+// IndexCreateOpts are optional fields to further configure the behavior of your index.
+//   - Sets: The sets to create the index on. Currently, only one set is supported.
+//   - Metadata: Extra metadata that can be attached to the index.
+//   - Storage: The storage configuration for the index. This allows you to
+//     configure your index and data to be stored in separate namespaces and/or sets.
+//   - HNSWParams: Extra options sent to the server to configure behavior of the
+//     HNSW algorithm.
+type IndexCreateOpts struct {
+	Storage    *protos.IndexStorage
+	HnswParams *protos.HnswParams
+	MetaData   map[string]string
+	Sets       []string
+}
+
 // IndexCreate creates a new Aerospike Vector Index and blocks until it is created.
 // It takes the following parameters:
 //   - namespace: The namespace of the index.
-//   - sets: The sets to create the index on. Currently, only one set is supported.
 //   - name: The name of the index.
 //   - vectorField: The field to create the index on.
 //   - dimensions: The number of dimensions in the vector.
 //   - vectorDistanceMetric: The distance metric to use for the index.
-//   - indexParams: Extra options sent to the server to configure behavior of the
-//     HNSW algorithm.
-//   - indexMetaData: Extra metadata that can be attached to the index.
-//   - indexStorage: The storage configuration for the index. This allows you to
-//     configure your index and data to be stored in separate namespaces and/or sets.
+//   - opts: Optional fields to configure the index
 //
 // It returns an error if the index creation fails.
 func (c *AdminClient) IndexCreate(
 	ctx context.Context,
 	namespace string,
-	sets []string,
 	name string,
 	vectorField string,
 	dimensions uint32,
 	vectorDistanceMetric protos.VectorDistanceMetric,
-	indexParams *protos.HnswParams,
-	indexMetaData map[string]string,
-	indexStorage *protos.IndexStorage,
+	opts *IndexCreateOpts,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "creating index")
@@ -114,10 +118,10 @@ func (c *AdminClient) IndexCreate(
 
 	var set *string
 
-	if len(sets) > 0 {
-		set = &sets[0]
+	if len(opts.Sets) > 0 {
+		set = &opts.Sets[0]
 
-		if len(sets) > 1 {
+		if len(opts.Sets) > 1 {
 			logger.Warn(
 				"multiple sets not yet supported for index creation, only the first set will be used",
 				slog.String("set", *set),
@@ -134,9 +138,9 @@ func (c *AdminClient) IndexCreate(
 		VectorDistanceMetric: vectorDistanceMetric,
 		Field:                vectorField,
 		SetFilter:            set,
-		Params:               &protos.IndexDefinition_HnswParams{HnswParams: indexParams},
-		Labels:               indexMetaData,
-		Storage:              indexStorage,
+		Params:               &protos.IndexDefinition_HnswParams{HnswParams: opts.HnswParams},
+		Labels:               opts.MetaData,
+		Storage:              opts.Storage,
 	}
 
 	client := protos.NewIndexServiceClient(conn)
@@ -153,6 +157,51 @@ func (c *AdminClient) IndexCreate(
 	defer cancel()
 
 	return c.waitForIndexCreation(ctx, namespace, name, indexWaitDuration)
+}
+
+// IndexUpdate updates an existing Aerospike Vector Index's dynamic
+// configuration params
+func (c *AdminClient) IndexUpdate(
+	ctx context.Context,
+	namespace string,
+	name string,
+	metadata map[string]string,
+	hnswParams *protos.HnswIndexUpdate,
+) error {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+
+	logger.InfoContext(ctx, "updating index")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to update index"
+		logger.Error(msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	indexUpdate := &protos.IndexUpdateRequest{
+		IndexId: &protos.IndexId{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Labels: metadata,
+		Update: &protos.IndexUpdateRequest_HnswIndexUpdate{
+			HnswIndexUpdate: hnswParams,
+		},
+	}
+
+	client := protos.NewIndexServiceClient(conn)
+
+	_, err = client.Update(ctx, indexUpdate)
+	if err != nil {
+		msg := "failed to update index"
+		logger.Error(msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
 }
 
 // IndexDrop drops an existing Aerospike Vector Index and blocks until it is.
@@ -277,6 +326,44 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	}
 
 	return indexStatus, nil
+}
+
+// GcInvalidVertices garbage collects invalid vertices in an Aerospike Vector Index.
+func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.String("name", name),
+		slog.Any("cutoffTime", cutoffTime),
+	)
+
+	logger.InfoContext(ctx, "garbage collection invalid vertices")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to garbage collect invalid vertices"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	gcRequest := &protos.GcInvalidVerticesRequest{
+		IndexId: &protos.IndexId{
+			Namespace: namespace,
+			Name:      name,
+		},
+		CutoffTimestamp: cutoffTime.Unix(),
+	}
+	client := protos.NewIndexServiceClient(conn)
+
+	_, err = client.GcInvalidVertices(ctx, gcRequest)
+	if err != nil {
+		msg := "failed to garbage collect invalid vertices"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return nil
 }
 
 // CreateUser creates a new user with the provided username, password, and roles.

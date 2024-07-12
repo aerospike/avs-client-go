@@ -25,6 +25,8 @@ const _ = grpc.SupportPackageIsVersion7
 type IndexServiceClient interface {
 	// Create an index.
 	Create(ctx context.Context, in *IndexDefinition, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Create an index.
+	Update(ctx context.Context, in *IndexUpdateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Drop an index.
 	Drop(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// List available indices.
@@ -34,6 +36,8 @@ type IndexServiceClient interface {
 	// Query status of an index.
 	// NOTE: API is subject to change.
 	GetStatus(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*IndexStatusResponse, error)
+	// Garbage collect vertices identified as invalid before cutoff timestamp.
+	GcInvalidVertices(ctx context.Context, in *GcInvalidVerticesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type indexServiceClient struct {
@@ -47,6 +51,15 @@ func NewIndexServiceClient(cc grpc.ClientConnInterface) IndexServiceClient {
 func (c *indexServiceClient) Create(ctx context.Context, in *IndexDefinition, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/Create", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexServiceClient) Update(ctx context.Context, in *IndexUpdateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/Update", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +102,23 @@ func (c *indexServiceClient) GetStatus(ctx context.Context, in *IndexId, opts ..
 	return out, nil
 }
 
+func (c *indexServiceClient) GcInvalidVertices(ctx context.Context, in *GcInvalidVerticesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/GcInvalidVertices", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexServiceServer is the server API for IndexService service.
 // All implementations must embed UnimplementedIndexServiceServer
 // for forward compatibility
 type IndexServiceServer interface {
 	// Create an index.
 	Create(context.Context, *IndexDefinition) (*emptypb.Empty, error)
+	// Create an index.
+	Update(context.Context, *IndexUpdateRequest) (*emptypb.Empty, error)
 	// Drop an index.
 	Drop(context.Context, *IndexId) (*emptypb.Empty, error)
 	// List available indices.
@@ -104,6 +128,8 @@ type IndexServiceServer interface {
 	// Query status of an index.
 	// NOTE: API is subject to change.
 	GetStatus(context.Context, *IndexId) (*IndexStatusResponse, error)
+	// Garbage collect vertices identified as invalid before cutoff timestamp.
+	GcInvalidVertices(context.Context, *GcInvalidVerticesRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedIndexServiceServer()
 }
 
@@ -113,6 +139,9 @@ type UnimplementedIndexServiceServer struct {
 
 func (UnimplementedIndexServiceServer) Create(context.Context, *IndexDefinition) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (UnimplementedIndexServiceServer) Update(context.Context, *IndexUpdateRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
 func (UnimplementedIndexServiceServer) Drop(context.Context, *IndexId) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Drop not implemented")
@@ -125,6 +154,9 @@ func (UnimplementedIndexServiceServer) Get(context.Context, *IndexId) (*IndexDef
 }
 func (UnimplementedIndexServiceServer) GetStatus(context.Context, *IndexId) (*IndexStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
+}
+func (UnimplementedIndexServiceServer) GcInvalidVertices(context.Context, *GcInvalidVerticesRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GcInvalidVertices not implemented")
 }
 func (UnimplementedIndexServiceServer) mustEmbedUnimplementedIndexServiceServer() {}
 
@@ -153,6 +185,24 @@ func _IndexService_Create_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IndexServiceServer).Create(ctx, req.(*IndexDefinition))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IndexService_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IndexUpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexServiceServer).Update(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/aerospike.vector.IndexService/Update",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexServiceServer).Update(ctx, req.(*IndexUpdateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -229,6 +279,24 @@ func _IndexService_GetStatus_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IndexService_GcInvalidVertices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GcInvalidVerticesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexServiceServer).GcInvalidVertices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/aerospike.vector.IndexService/GcInvalidVertices",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexServiceServer).GcInvalidVertices(ctx, req.(*GcInvalidVerticesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IndexService_ServiceDesc is the grpc.ServiceDesc for IndexService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -239,6 +307,10 @@ var IndexService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Create",
 			Handler:    _IndexService_Create_Handler,
+		},
+		{
+			MethodName: "Update",
+			Handler:    _IndexService_Update_Handler,
 		},
 		{
 			MethodName: "Drop",
@@ -255,6 +327,10 @@ var IndexService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStatus",
 			Handler:    _IndexService_GetStatus_Handler,
+		},
+		{
+			MethodName: "GcInvalidVertices",
+			Handler:    _IndexService_GcInvalidVertices_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

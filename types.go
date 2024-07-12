@@ -38,4 +38,16 @@ func (hps HostPortSlice) String() string {
 	return fmt.Sprintf("[%s]", strings.Join(s, ", "))
 }
 
+type UserPassCredentials struct {
+	username string
+	password string
+}
+
+func NewCredntialsFromUserPass(username, password string) *UserPassCredentials {
+	return &UserPassCredentials{
+		username: username,
+		password: password,
+	}
+}
+
 var ErrNotImplemented = errors.New("not implemented")
