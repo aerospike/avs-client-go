@@ -82,7 +82,7 @@ func (c *AdminClient) Close() {
 type IndexCreateOpts struct {
 	Storage    *protos.IndexStorage
 	HnswParams *protos.HnswParams
-	MetaData   map[string]string
+	Labels     map[string]string
 	Sets       []string
 }
 
@@ -116,17 +116,28 @@ func (c *AdminClient) IndexCreate(
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	var set *string
+	var (
+		set     *string
+		params  *protos.IndexDefinition_HnswParams
+		labels  map[string]string
+		storage *protos.IndexStorage
+	)
 
-	if len(opts.Sets) > 0 {
-		set = &opts.Sets[0]
+	if opts != nil {
+		if len(opts.Sets) > 0 {
+			set = &opts.Sets[0]
 
-		if len(opts.Sets) > 1 {
-			logger.Warn(
-				"multiple sets not yet supported for index creation, only the first set will be used",
-				slog.String("set", *set),
-			)
+			if len(opts.Sets) > 1 {
+				logger.Warn(
+					"multiple sets not yet supported for index creation, only the first set will be used",
+					slog.String("set", *set),
+				)
+			}
 		}
+
+		params = &protos.IndexDefinition_HnswParams{HnswParams: opts.HnswParams}
+		labels = opts.Labels
+		storage = opts.Storage
 	}
 
 	indexDef := &protos.IndexDefinition{
@@ -138,9 +149,9 @@ func (c *AdminClient) IndexCreate(
 		VectorDistanceMetric: vectorDistanceMetric,
 		Field:                vectorField,
 		SetFilter:            set,
-		Params:               &protos.IndexDefinition_HnswParams{HnswParams: opts.HnswParams},
-		Labels:               opts.MetaData,
-		Storage:              opts.Storage,
+		Params:               params,
+		Labels:               labels,
+		Storage:              storage,
 	}
 
 	client := protos.NewIndexServiceClient(conn)
