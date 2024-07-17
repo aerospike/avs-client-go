@@ -108,14 +108,6 @@ func (c *AdminClient) IndexCreate(
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "creating index")
 
-	conn, err := c.channelProvider.GetConn()
-	if err != nil {
-		msg := "failed to create index"
-		logger.Error(msg, slog.Any("error", err))
-
-		return NewAVSErrorFromGrpc(msg, err)
-	}
-
 	var (
 		set     *string
 		params  *protos.IndexDefinition_HnswParams
@@ -154,6 +146,28 @@ func (c *AdminClient) IndexCreate(
 		Storage:              storage,
 	}
 
+	return c.IndexCreateFromIndexDef(ctx, indexDef)
+}
+
+// IndexCreateFromIndexDef creates a new Aerospike Vector Index from a provided
+// IndexDefinition and blocks until it is created. It can be easily used in
+// conjuction with IndexList and IndexGet to create a new index using the
+// returned IndexDefinitions.
+func (c *AdminClient) IndexCreateFromIndexDef(
+	ctx context.Context,
+	indexDef *protos.IndexDefinition,
+) error {
+	logger := c.logger.With(slog.Any("definition", indexDef))
+	logger.InfoContext(ctx, "creating index from definition")
+
+	conn, err := c.channelProvider.GetConn()
+	if err != nil {
+		msg := "failed to create index from definition"
+		logger.Error(msg, slog.Any("error", err))
+
+		return NewAVSErrorFromGrpc(msg, err)
+	}
+
 	client := protos.NewIndexServiceClient(conn)
 
 	_, err = client.Create(ctx, indexDef)
@@ -167,7 +181,7 @@ func (c *AdminClient) IndexCreate(
 	ctx, cancel := context.WithTimeout(ctx, indexTimeoutDuration)
 	defer cancel()
 
-	return c.waitForIndexCreation(ctx, namespace, name, indexWaitDuration)
+	return c.waitForIndexCreation(ctx, indexDef.Id.Namespace, indexDef.Id.Name, indexWaitDuration)
 }
 
 // IndexUpdate updates an existing Aerospike Vector Index's dynamic
