@@ -151,7 +151,7 @@ func (c *AdminClient) IndexCreate(
 
 // IndexCreateFromIndexDef creates a new Aerospike Vector Index from a provided
 // IndexDefinition and blocks until it is created. It can be easily used in
-// conjuction with IndexList and IndexGet to create a new index using the
+// conjunction with IndexList and IndexGet to create a new index using the
 // returned IndexDefinitions.
 func (c *AdminClient) IndexCreateFromIndexDef(
 	ctx context.Context,
