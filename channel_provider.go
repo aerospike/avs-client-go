@@ -26,8 +26,8 @@ type channelAndEndpoints struct {
 	Endpoints *protos.ServerEndpointList
 }
 
-// newChannelAndEndpoints creates a new channelAndEndpoints instance.
-func newChannelAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
+// newConnAndEndpoints creates a new channelAndEndpoints instance.
+func newConnAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
 	return &channelAndEndpoints{
 		Channel:   channel,
 		Endpoints: endpoints,
@@ -112,14 +112,14 @@ func newChannelProvider(
 
 	// Schedule token refresh if token manager is present.
 	if token != nil {
-		cp.token.ScheduleRefresh(cp.GetConn)
+		cp.token.ScheduleRefresh(cp.GetRandomConn)
 	}
 
 	// Start the tend routine if load balancing is disabled.
 	if !isLoadBalancer {
-		cp.logger.Debug("starting tend routine")
 		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
 
+		cp.logger.Debug("starting tend routine")
 		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
 	} else {
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
@@ -175,8 +175,22 @@ func (cp *channelProvider) Close() error {
 	return firstErr
 }
 
-// GetConn returns a gRPC client connection to an Aerospike server.
-func (cp *channelProvider) GetConn() (*grpc.ClientConn, error) {
+func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
+	if cp.closed {
+		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
+		return nil, errors.New("ChannelProvider is closed")
+	}
+
+	if len(cp.seedConns) == 0 {
+		cp.logger.Warn("no seed channels found")
+		return nil, errors.New("no seed channels found")
+	}
+
+	return cp.seedConns[0], nil
+}
+
+// GetRandomConn returns a gRPC client connection to an Aerospike server.
+func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
@@ -184,7 +198,7 @@ func (cp *channelProvider) GetConn() (*grpc.ClientConn, error) {
 
 	if cp.isLoadBalancer {
 		cp.logger.Debug("load balancer is enabled, using seed channel")
-		return cp.seedConns[0], nil
+		return cp.GetSeedConn()
 	}
 
 	cp.nodeConnsLock.RLock()
@@ -192,18 +206,57 @@ func (cp *channelProvider) GetConn() (*grpc.ClientConn, error) {
 
 	discoverdChannels := make([]*channelAndEndpoints, len(cp.nodeConns))
 
-	for i, channel := range cp.nodeConns {
+	i := 0
+	for _, channel := range cp.nodeConns {
 		discoverdChannels[i] = channel
+		i += 1
 	}
 
 	if len(discoverdChannels) == 0 {
 		cp.logger.Warn("no node channels found, using seed channel")
-		return cp.seedConns[0], nil
+		return cp.GetSeedConn()
 	}
 
 	idx := rand.Intn(len(discoverdChannels)) //nolint:gosec // Security is not an issue here
 
 	return discoverdChannels[idx].Channel, nil
+}
+
+func (cp *channelProvider) GetNodeConn(nodeId uint64) (*grpc.ClientConn, error) {
+	if cp.closed {
+		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
+		return nil, errors.New("ChannelProvider is closed")
+	}
+
+	if cp.isLoadBalancer {
+		cp.logger.Error("load balancer is enabled, using seed channel")
+		return nil, errors.New("load balancer is enabled, cannot get specific node channel")
+	}
+
+	cp.nodeConnsLock.RLock()
+	defer cp.nodeConnsLock.RUnlock()
+
+	channel, ok := cp.nodeConns[nodeId]
+	if !ok {
+		msg := "channel not found for specified node id"
+		cp.logger.Error(msg, slog.Uint64("node", nodeId))
+		return nil, errors.New(msg)
+	}
+
+	return channel.Channel, nil
+}
+
+func (cp *channelProvider) GetNodeIds() []uint64 {
+	cp.nodeConnsLock.RLock()
+	defer cp.nodeConnsLock.RUnlock()
+
+	nodeIds := make([]uint64, 0, len(cp.nodeConns))
+
+	for node := range cp.nodeConns {
+		nodeIds = append(nodeIds, node)
+	}
+
+	return nodeIds
 }
 
 // connectToSeeds connects to the seed nodes and creates gRPC client connections.
@@ -303,16 +356,24 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 
 // updateNodeConns updates the gRPC client connection for a specific node.
 func (cp *channelProvider) updateNodeConns(
+	ctx context.Context,
 	node uint64,
 	endpoints *protos.ServerEndpointList,
 ) error {
-	newChannel, err := cp.createChannelFromEndpoints(endpoints)
+	newConn, err := cp.createConnFromEndpoints(endpoints)
+	if err != nil {
+		return err
+	}
+
+	client := protos.NewAboutServiceClient(newConn)
+	_, err = client.Get(ctx, &protos.AboutRequest{})
+
 	if err != nil {
 		return err
 	}
 
 	cp.nodeConnsLock.Lock()
-	cp.nodeConns[node] = newChannelAndEndpoints(newChannel, endpoints)
+	cp.nodeConns[node] = newConnAndEndpoints(newConn, endpoints)
 	cp.nodeConnsLock.Unlock()
 
 	return nil
@@ -398,13 +459,15 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 		}
 	}
 
+	cp.logger.Debug("found new cluster ID", slog.Any("endpoints", maxTempEndpoints))
+
 	return maxTempEndpoints
 }
 
 // checkAndSetNodeConns checks if the node connections need to be updated and updates them if necessary.
-func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
+func (cp *channelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndpoints map[uint64]*protos.ServerEndpointList) map[uint64]error {
 	wg := sync.WaitGroup{}
-
+	errors := make(map[uint64]error, len(newNodeEndpoints))
 	// Find which nodes have a different endpoint list and update their channel
 	for node, newEndpoints := range newNodeEndpoints {
 		wg.Add(1)
@@ -428,18 +491,27 @@ func (cp *channelProvider) checkAndSetNodeConns(newNodeEndpoints map[uint64]*pro
 					}
 
 					// Either this is a new node or its endpoints have changed
-					err = cp.updateNodeConns(node, newEndpoints)
+					err = cp.updateNodeConns(ctx, node, newEndpoints)
 					if err != nil {
 						logger.Error("failed to create new channel", slog.Any("error", err))
 					}
+				} else {
+					cp.logger.Debug("endpoints for node unchanged")
 				}
 			} else {
-				cp.logger.Debug("endpoints for node unchanged", slog.Uint64("node", node))
+				logger.Debug("new node found, creating new channel")
+
+				err := cp.updateNodeConns(ctx, node, newEndpoints)
+				if err != nil {
+					logger.Error("failed to create new channel", slog.Any("error", err))
+				}
 			}
 		}(node, newEndpoints)
 	}
 
 	wg.Wait()
+
+	return errors
 }
 
 // removeDownNodes removes the gRPC client connections for nodes in nodeConns
@@ -470,9 +542,9 @@ func (cp *channelProvider) updateClusterChannels(ctx context.Context) {
 		return
 	}
 
-	cp.logger.Debug("new endpoints found, updating channels", slog.Any("endpoints", updatedEndpoints))
+	cp.logger.Debug("new cluster id found, updating channels")
 
-	cp.checkAndSetNodeConns(updatedEndpoints)
+	cp.checkAndSetNodeConns(ctx, updatedEndpoints)
 	cp.removeDownNodes(updatedEndpoints)
 }
 
@@ -549,9 +621,9 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
-// createChannelFromEndpoints creates a gRPC client connection from the first
+// createConnFromEndpoints creates a gRPC client connection from the first
 // successful endpoint in endpoints.
-func (cp *channelProvider) createChannelFromEndpoints(
+func (cp *channelProvider) createConnFromEndpoints(
 	endpoints *protos.ServerEndpointList,
 ) (*grpc.ClientConn, error) {
 	for _, endpoint := range endpoints.Endpoints {
@@ -575,11 +647,11 @@ func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, 
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {
-		cp.logger.Debug("using insecure connection to host", slog.String("host", hostPort.String()))
+		cp.logger.Info("using insecure connection to host", slog.String("host", hostPort.String()))
 
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
-		cp.logger.Debug("using secure tls connection to host", slog.String("host", hostPort.String()))
+		cp.logger.Info("using secure tls connection to host", slog.String("host", hostPort.String()))
 
 		opts = append(opts, grpc.WithTransportCredentials(grpcCreds.NewTLS(cp.tlsConfig)))
 	}

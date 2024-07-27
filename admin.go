@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aerospike/avs-client-go/protos"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -44,7 +45,7 @@ func NewAdminClient(
 	logger *slog.Logger,
 ) (*AdminClient, error) {
 	logger = logger.WithGroup("avs.admin")
-	logger.Debug("creating new client")
+	logger.Info("creating new client")
 
 	channelProvider, err := newChannelProvider(
 		ctx,
@@ -160,7 +161,7 @@ func (c *AdminClient) IndexCreateFromIndexDef(
 	logger := c.logger.With(slog.Any("definition", indexDef))
 	logger.InfoContext(ctx, "creating index from definition")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to create index from definition"
 		logger.Error(msg, slog.Any("error", err))
@@ -197,7 +198,7 @@ func (c *AdminClient) IndexUpdate(
 
 	logger.InfoContext(ctx, "updating index")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to update index"
 		logger.Error(msg, slog.Any("error", err))
@@ -234,7 +235,7 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "dropping index")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to drop index"
 		logger.Error(msg, slog.Any("error", err))
@@ -269,7 +270,7 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
 	c.logger.InfoContext(ctx, "listing indexes")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get indexes"
 
@@ -298,7 +299,7 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "getting index")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get index"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -328,7 +329,7 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "getting index status")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get index status"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -363,7 +364,7 @@ func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace, name str
 
 	logger.InfoContext(ctx, "garbage collection invalid vertices")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to garbage collect invalid vertices"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -396,7 +397,7 @@ func (c *AdminClient) CreateUser(ctx context.Context, username, password string,
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "creating user")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to create user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -427,7 +428,7 @@ func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password 
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "updating user credentials")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to update user credentials"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -457,7 +458,7 @@ func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "dropping user")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to drop user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -487,7 +488,7 @@ func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.Use
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "getting user")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -516,7 +517,7 @@ func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.Use
 func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
 	c.logger.InfoContext(ctx, "listing users")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to list users"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -542,7 +543,7 @@ func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []s
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "granting user roles")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to grant user roles"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -573,7 +574,7 @@ func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "revoking user roles")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to revoke user roles"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -603,7 +604,7 @@ func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []
 func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
 	c.logger.InfoContext(ctx, "listing roles")
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to list roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -624,6 +625,128 @@ func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse,
 	return rolesResp, nil
 }
 
+func (c *AdminClient) NodeIds(ctx context.Context) []*protos.NodeId {
+	c.logger.InfoContext(ctx, "getting cluster info")
+
+	ids := c.channelProvider.GetNodeIds()
+	nodeIds := make([]*protos.NodeId, len(ids))
+
+	for i, id := range ids {
+		nodeIds[i] = &protos.NodeId{Id: id}
+	}
+
+	c.logger.Debug("got node ids", slog.Any("nodeIds", nodeIds))
+
+	return nodeIds
+}
+
+func (c *AdminClient) ClusteringState(ctx context.Context, nodeId *protos.NodeId) (*protos.ClusteringState, error) {
+	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeId", nodeId))
+
+	var (
+		conn *grpc.ClientConn
+		err  error
+	)
+
+	if nodeId == nil {
+		conn, err = c.channelProvider.GetSeedConn()
+	} else {
+		conn, err = c.channelProvider.GetNodeConn(nodeId.GetId())
+	}
+
+	if err != nil {
+		msg := "failed to list roles"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewClusterInfoServiceClient(conn)
+
+	state, err := client.GetClusteringState(ctx, &emptypb.Empty{})
+	if err != nil {
+		msg := "failed to get clustering state"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return state, nil
+}
+
+func (c *AdminClient) ClusterEndpoints(ctx context.Context, nodeId *protos.NodeId, listenerName *string) (*protos.ClusterNodeEndpoints, error) {
+	c.logger.InfoContext(ctx, "getting cluster endpoints for node", slog.Any("nodeId", nodeId))
+
+	var (
+		conn *grpc.ClientConn
+		err  error
+	)
+
+	if nodeId == nil {
+		conn, err = c.channelProvider.GetSeedConn()
+	} else {
+		conn, err = c.channelProvider.GetNodeConn(nodeId.GetId())
+	}
+
+	if err != nil {
+		msg := "failed to get cluster endpoints"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewClusterInfoServiceClient(conn)
+
+	endpoints, err := client.GetClusterEndpoints(ctx,
+		&protos.ClusterNodeEndpointsRequest{
+			ListenerName: listenerName,
+		},
+	)
+	if err != nil {
+		msg := "failed to get cluster endpoints"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return endpoints, nil
+
+}
+
+func (c *AdminClient) About(ctx context.Context, nodeId *protos.NodeId) (*protos.AboutResponse, error) {
+	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
+
+	var (
+		conn *grpc.ClientConn
+		err  error
+	)
+
+	if nodeId == nil {
+		conn, err = c.channelProvider.GetSeedConn()
+	} else {
+		conn, err = c.channelProvider.GetNodeConn(nodeId.GetId())
+	}
+
+	if err != nil {
+		msg := "failed to make about request"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	client := protos.NewAboutServiceClient(conn)
+
+	resp, err := client.Get(ctx, &protos.AboutRequest{})
+	if err != nil {
+		msg := "failed to make about request"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	return resp, nil
+}
+
 // waitForIndexCreation waits for an index to be created and blocks until it is.
 // The amount of time to wait between each call is defined by waitInterval.
 func (c *AdminClient) waitForIndexCreation(ctx context.Context,
@@ -633,7 +756,7 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to wait for index creation"
 		logger.Error(msg, slog.Any("error", err))
@@ -689,7 +812,7 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name string, waitInterval time.Duration) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
-	conn, err := c.channelProvider.GetConn()
+	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to wait for index deletion"
 		logger.Error(msg, slog.Any("error", err))
