@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/tls"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aerospike/avs-client-go/protos"
@@ -625,6 +627,8 @@ func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse,
 	return rolesResp, nil
 }
 
+// NodeIds returns a list of all the node ids that the client is connected to.
+// If a node is accessible but not apart of the cluster it will not be returned.
 func (c *AdminClient) NodeIds(ctx context.Context) []*protos.NodeId {
 	c.logger.InfoContext(ctx, "getting cluster info")
 
@@ -640,6 +644,53 @@ func (c *AdminClient) NodeIds(ctx context.Context) []*protos.NodeId {
 	return nodeIds
 }
 
+// ConnectedNodeEndpoint returns the endpoint used to connect to a node. If
+// nodeId is nil then an endpoint used to connect to your seed (or
+// load-balancer) is used.
+func (c *AdminClient) ConnectedNodeEndpoint(ctx context.Context, nodeId *protos.NodeId) (*protos.ServerEndpoint, error) {
+	c.logger.InfoContext(ctx, "getting connected endpoint for node", slog.Any("nodeId", nodeId))
+
+	var (
+		conn *grpc.ClientConn
+		err  error
+	)
+
+	if nodeId == nil {
+		conn, err = c.channelProvider.GetSeedConn()
+	} else {
+		conn, err = c.channelProvider.GetNodeConn(nodeId.Id)
+	}
+
+	if err != nil {
+		msg := "failed to get connected endpoint"
+		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+		return nil, NewAVSError(msg)
+	}
+
+	splitEndpoint := strings.Split(conn.Target(), ":")
+
+	resp := protos.ServerEndpoint{
+		Address: splitEndpoint[0],
+	}
+
+	if len(splitEndpoint) > 1 {
+		port, err := strconv.ParseUint(splitEndpoint[1], 10, 32)
+		if err != nil {
+			msg := "failed to parse port"
+			c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+			return nil, NewAVSErrorFromGrpc(msg, err)
+		}
+
+		resp.Port = uint32(port)
+	}
+
+	return &resp, nil
+}
+
+// ClusteringState returns the state of the cluster according the
+// given node.  If nodeId is nil then the seed node is used.
 func (c *AdminClient) ClusteringState(ctx context.Context, nodeId *protos.NodeId) (*protos.ClusteringState, error) {
 	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeId", nodeId))
 
@@ -674,6 +725,9 @@ func (c *AdminClient) ClusteringState(ctx context.Context, nodeId *protos.NodeId
 	return state, nil
 }
 
+// ClusterEndpoints returns the endpoints of all the nodes in the cluster
+// according to the specified node. If nodeId is nil then the seed node is used.
+// If listenerName is nil then the default listener name is used.
 func (c *AdminClient) ClusterEndpoints(ctx context.Context, nodeId *protos.NodeId, listenerName *string) (*protos.ClusterNodeEndpoints, error) {
 	c.logger.InfoContext(ctx, "getting cluster endpoints for node", slog.Any("nodeId", nodeId))
 
@@ -710,9 +764,10 @@ func (c *AdminClient) ClusterEndpoints(ctx context.Context, nodeId *protos.NodeI
 	}
 
 	return endpoints, nil
-
 }
 
+// About returns information about the provided node. If nodeId is nil
+// then the seed node is used.
 func (c *AdminClient) About(ctx context.Context, nodeId *protos.NodeId) (*protos.AboutResponse, error) {
 	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
 

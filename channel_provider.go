@@ -175,6 +175,7 @@ func (cp *channelProvider) Close() error {
 	return firstErr
 }
 
+// GetSeedConn returns a gRPC client connection to a seed node.
 func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
@@ -186,10 +187,13 @@ func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 		return nil, errors.New("no seed channels found")
 	}
 
-	return cp.seedConns[0], nil
+	idx := rand.Intn(len(cp.seedConns))
+
+	return cp.seedConns[idx], nil
 }
 
-// GetRandomConn returns a gRPC client connection to an Aerospike server.
+// GetRandomConn returns a gRPC client connection to an Aerospike server. If
+// isLoadBalancer is enabled, it will return the seed connection.
 func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
@@ -313,14 +317,17 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 				tokenLock.Unlock()
 			}
 
-			// TODO: Check compatible client/server version here
 			if extraCheck {
-				client := protos.NewClusterInfoServiceClient(conn)
+				client := protos.NewAboutServiceClient(conn)
 
-				_, err = client.GetClusterId(ctx, &emptypb.Empty{})
+				about, err := client.Get(ctx, &protos.AboutRequest{})
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
 					return
+				}
+
+				if newVersion(about.Version).LT(minimumSupportedAVSVersion) {
+					logger.WarnContext(ctx, "incompatible server version", slog.String("version", about.Version))
 				}
 			}
 
