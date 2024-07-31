@@ -71,20 +71,20 @@ func compare(a, b version, strFunc compareFunc[string], intFunc compareFunc[int]
 	sharedLen := min(len(a), len(b))
 
 	for i := 0; i < sharedLen; i++ {
-		switch a[i].(type) {
+		switch aVal := a[i].(type) {
 		case uint64:
-			switch b[i].(type) {
+			switch bVal := b[i].(type) {
 			case uint64:
-				if intFunc(int(a[i].(uint64)), int(b[i].(uint64))) {
+				if intFunc(int(aVal), int(bVal)) {
 					return true
 				}
 			default:
 				return false
 			}
 		case string:
-			switch b[i].(type) {
+			switch bVal := b[i].(type) {
 			case string:
-				if strFunc(a[i].(string), b[i].(string)) {
+				if strFunc(aVal, bVal) {
 					return true
 				}
 			default:

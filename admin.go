@@ -629,36 +629,39 @@ func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse,
 
 // NodeIds returns a list of all the node ids that the client is connected to.
 // If a node is accessible but not apart of the cluster it will not be returned.
-func (c *AdminClient) NodeIds(ctx context.Context) []*protos.NodeId {
+func (c *AdminClient) NodeIDs(ctx context.Context) []*protos.NodeId {
 	c.logger.InfoContext(ctx, "getting cluster info")
 
-	ids := c.channelProvider.GetNodeIds()
-	nodeIds := make([]*protos.NodeId, len(ids))
+	ids := c.channelProvider.GetNodeIDs()
+	nodeIDs := make([]*protos.NodeId, len(ids))
 
 	for i, id := range ids {
-		nodeIds[i] = &protos.NodeId{Id: id}
+		nodeIDs[i] = &protos.NodeId{Id: id}
 	}
 
-	c.logger.Debug("got node ids", slog.Any("nodeIds", nodeIds))
+	c.logger.Debug("got node ids", slog.Any("nodeIDs", nodeIDs))
 
-	return nodeIds
+	return nodeIDs
 }
 
 // ConnectedNodeEndpoint returns the endpoint used to connect to a node. If
-// nodeId is nil then an endpoint used to connect to your seed (or
+// nodeID is nil then an endpoint used to connect to your seed (or
 // load-balancer) is used.
-func (c *AdminClient) ConnectedNodeEndpoint(ctx context.Context, nodeId *protos.NodeId) (*protos.ServerEndpoint, error) {
-	c.logger.InfoContext(ctx, "getting connected endpoint for node", slog.Any("nodeId", nodeId))
+func (c *AdminClient) ConnectedNodeEndpoint(
+	ctx context.Context,
+	nodeID *protos.NodeId,
+) (*protos.ServerEndpoint, error) {
+	c.logger.InfoContext(ctx, "getting connected endpoint for node", slog.Any("nodeID", nodeID))
 
 	var (
 		conn *grpc.ClientConn
 		err  error
 	)
 
-	if nodeId == nil {
+	if nodeID == nil {
 		conn, err = c.channelProvider.GetSeedConn()
 	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeId.Id)
+		conn, err = c.channelProvider.GetNodeConn(nodeID.Id)
 	}
 
 	if err != nil {
@@ -690,19 +693,19 @@ func (c *AdminClient) ConnectedNodeEndpoint(ctx context.Context, nodeId *protos.
 }
 
 // ClusteringState returns the state of the cluster according the
-// given node.  If nodeId is nil then the seed node is used.
-func (c *AdminClient) ClusteringState(ctx context.Context, nodeId *protos.NodeId) (*protos.ClusteringState, error) {
-	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeId", nodeId))
+// given node.  If nodeID is nil then the seed node is used.
+func (c *AdminClient) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*protos.ClusteringState, error) {
+	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeID", nodeID))
 
 	var (
 		conn *grpc.ClientConn
 		err  error
 	)
 
-	if nodeId == nil {
+	if nodeID == nil {
 		conn, err = c.channelProvider.GetSeedConn()
 	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeId.GetId())
+		conn, err = c.channelProvider.GetNodeConn(nodeID.GetId())
 	}
 
 	if err != nil {
@@ -726,20 +729,24 @@ func (c *AdminClient) ClusteringState(ctx context.Context, nodeId *protos.NodeId
 }
 
 // ClusterEndpoints returns the endpoints of all the nodes in the cluster
-// according to the specified node. If nodeId is nil then the seed node is used.
+// according to the specified node. If nodeID is nil then the seed node is used.
 // If listenerName is nil then the default listener name is used.
-func (c *AdminClient) ClusterEndpoints(ctx context.Context, nodeId *protos.NodeId, listenerName *string) (*protos.ClusterNodeEndpoints, error) {
-	c.logger.InfoContext(ctx, "getting cluster endpoints for node", slog.Any("nodeId", nodeId))
+func (c *AdminClient) ClusterEndpoints(
+	ctx context.Context,
+	nodeID *protos.NodeId,
+	listenerName *string,
+) (*protos.ClusterNodeEndpoints, error) {
+	c.logger.InfoContext(ctx, "getting cluster endpoints for node", slog.Any("nodeID", nodeID))
 
 	var (
 		conn *grpc.ClientConn
 		err  error
 	)
 
-	if nodeId == nil {
+	if nodeID == nil {
 		conn, err = c.channelProvider.GetSeedConn()
 	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeId.GetId())
+		conn, err = c.channelProvider.GetNodeConn(nodeID.GetId())
 	}
 
 	if err != nil {
@@ -766,9 +773,9 @@ func (c *AdminClient) ClusterEndpoints(ctx context.Context, nodeId *protos.NodeI
 	return endpoints, nil
 }
 
-// About returns information about the provided node. If nodeId is nil
+// About returns information about the provided node. If nodeID is nil
 // then the seed node is used.
-func (c *AdminClient) About(ctx context.Context, nodeId *protos.NodeId) (*protos.AboutResponse, error) {
+func (c *AdminClient) About(ctx context.Context, nodeID *protos.NodeId) (*protos.AboutResponse, error) {
 	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
 
 	var (
@@ -776,10 +783,10 @@ func (c *AdminClient) About(ctx context.Context, nodeId *protos.NodeId) (*protos
 		err  error
 	)
 
-	if nodeId == nil {
+	if nodeID == nil {
 		conn, err = c.channelProvider.GetSeedConn()
 	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeId.GetId())
+		conn, err = c.channelProvider.GetNodeConn(nodeID.GetId())
 	}
 
 	if err != nil {

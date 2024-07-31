@@ -187,7 +187,7 @@ func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 		return nil, errors.New("no seed channels found")
 	}
 
-	idx := rand.Intn(len(cp.seedConns))
+	idx := rand.Intn(len(cp.seedConns)) //nolint:gosec // Security is not an issue here
 
 	return cp.seedConns[idx], nil
 }
@@ -211,9 +211,10 @@ func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 	discoverdChannels := make([]*channelAndEndpoints, len(cp.nodeConns))
 
 	i := 0
+
 	for _, channel := range cp.nodeConns {
 		discoverdChannels[i] = channel
-		i += 1
+		i++
 	}
 
 	if len(discoverdChannels) == 0 {
@@ -226,7 +227,7 @@ func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 	return discoverdChannels[idx].Channel, nil
 }
 
-func (cp *channelProvider) GetNodeConn(nodeId uint64) (*grpc.ClientConn, error) {
+func (cp *channelProvider) GetNodeConn(nodeID uint64) (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
@@ -240,27 +241,28 @@ func (cp *channelProvider) GetNodeConn(nodeId uint64) (*grpc.ClientConn, error) 
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	channel, ok := cp.nodeConns[nodeId]
+	channel, ok := cp.nodeConns[nodeID]
 	if !ok {
 		msg := "channel not found for specified node id"
-		cp.logger.Error(msg, slog.Uint64("node", nodeId))
+		cp.logger.Error(msg, slog.Uint64("node", nodeID))
+
 		return nil, errors.New(msg)
 	}
 
 	return channel.Channel, nil
 }
 
-func (cp *channelProvider) GetNodeIds() []uint64 {
+func (cp *channelProvider) GetNodeIDs() []uint64 {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	nodeIds := make([]uint64, 0, len(cp.nodeConns))
+	nodeIDs := make([]uint64, 0, len(cp.nodeConns))
 
 	for node := range cp.nodeConns {
-		nodeIds = append(nodeIds, node)
+		nodeIDs = append(nodeIDs, node)
 	}
 
-	return nodeIds
+	return nodeIDs
 }
 
 // connectToSeeds connects to the seed nodes and creates gRPC client connections.
@@ -472,9 +474,11 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 }
 
 // checkAndSetNodeConns checks if the node connections need to be updated and updates them if necessary.
-func (cp *channelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndpoints map[uint64]*protos.ServerEndpointList) map[uint64]error {
+func (cp *channelProvider) checkAndSetNodeConns(
+	ctx context.Context,
+	newNodeEndpoints map[uint64]*protos.ServerEndpointList,
+) {
 	wg := sync.WaitGroup{}
-	errors := make(map[uint64]error, len(newNodeEndpoints))
 	// Find which nodes have a different endpoint list and update their channel
 	for node, newEndpoints := range newNodeEndpoints {
 		wg.Add(1)
@@ -517,8 +521,6 @@ func (cp *channelProvider) checkAndSetNodeConns(ctx context.Context, newNodeEndp
 	}
 
 	wg.Wait()
-
-	return errors
 }
 
 // removeDownNodes removes the gRPC client connections for nodes in nodeConns
