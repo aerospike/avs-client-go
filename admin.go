@@ -21,8 +21,8 @@ const (
 	indexWaitDuration    = time.Millisecond * 100
 )
 
-// AdminClient is a client for managing Aerospike Vector Indexes.
-type AdminClient struct {
+// Client is a client for managing Aerospike Vector Indexes.
+type Client struct {
 	logger          *slog.Logger
 	channelProvider *channelProvider
 }
@@ -45,7 +45,7 @@ func NewAdminClient(
 	credentials *UserPassCredentials,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
-) (*AdminClient, error) {
+) (*Client, error) {
 	logger = logger.WithGroup("avs.admin")
 	logger.Info("creating new client")
 
@@ -63,16 +63,63 @@ func NewAdminClient(
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
 	}
 
-	return &AdminClient{
+	return &Client{
 		logger:          logger,
 		channelProvider: channelProvider,
 	}, nil
 }
 
 // Close closes the AdminClient and releases any resources associated with it.
-func (c *AdminClient) Close() {
+func (c *Client) Close() {
 	c.logger.Info("Closing client")
 	c.channelProvider.Close()
+}
+
+//nolint:revive // TODO
+func (c *Client) Get(ctx context.Context,
+	namespace,
+	setName string,
+	key any,
+	binNames []string,
+) (*protos.Record, error) {
+	return nil, ErrNotImplemented
+}
+
+//nolint:revive // TODO
+func (c *Client) Delete(ctx context.Context, namespace, setName string, key any) (*protos.Record, error) {
+	return nil, ErrNotImplemented
+}
+
+//nolint:revive // TODO
+func (c *Client) Exists(
+	ctx context.Context,
+	namespace,
+	setName string,
+	key any,
+) (bool, error) {
+	return false, ErrNotImplemented
+}
+
+//nolint:revive // TODO
+func (c *Client) IsIndexed(ctx context.Context, namespace, setName, indexName string, key any) (bool, error) {
+	return false, ErrNotImplemented
+}
+
+//nolint:revive // TODO
+func (c *Client) VectorSearch(ctx context.Context,
+	namespace,
+	indexName string,
+	query []float32,
+	limit int,
+	searchParams *protos.HnswSearchParams,
+	binNames []string,
+) ([]*protos.Neighbor, error) {
+	return nil, ErrNotImplemented
+}
+
+//nolint:revive // TODO
+func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexName string, timeout int) error {
+	return ErrNotImplemented
 }
 
 // IndexCreateOpts are optional fields to further configure the behavior of your index.
@@ -99,7 +146,7 @@ type IndexCreateOpts struct {
 //   - opts: Optional fields to configure the index
 //
 // It returns an error if the index creation fails.
-func (c *AdminClient) IndexCreate(
+func (c *Client) IndexCreate(
 	ctx context.Context,
 	namespace string,
 	name string,
@@ -156,7 +203,7 @@ func (c *AdminClient) IndexCreate(
 // IndexDefinition and blocks until it is created. It can be easily used in
 // conjunction with IndexList and IndexGet to create a new index using the
 // returned IndexDefinitions.
-func (c *AdminClient) IndexCreateFromIndexDef(
+func (c *Client) IndexCreateFromIndexDef(
 	ctx context.Context,
 	indexDef *protos.IndexDefinition,
 ) error {
@@ -189,7 +236,7 @@ func (c *AdminClient) IndexCreateFromIndexDef(
 
 // IndexUpdate updates an existing Aerospike Vector Index's dynamic
 // configuration params
-func (c *AdminClient) IndexUpdate(
+func (c *Client) IndexUpdate(
 	ctx context.Context,
 	namespace string,
 	name string,
@@ -233,7 +280,7 @@ func (c *AdminClient) IndexUpdate(
 }
 
 // IndexDrop drops an existing Aerospike Vector Index and blocks until it is.
-func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) error {
+func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "dropping index")
 
@@ -269,7 +316,7 @@ func (c *AdminClient) IndexDrop(ctx context.Context, namespace, name string) err
 
 // IndexList returns a list of all Aerospike Vector Indexes. To get a single
 // index use IndexGet.
-func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
+func (c *Client) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
 	c.logger.InfoContext(ctx, "listing indexes")
 
 	conn, err := c.channelProvider.GetRandomConn()
@@ -297,7 +344,7 @@ func (c *AdminClient) IndexList(ctx context.Context) (*protos.IndexDefinitionLis
 
 // IndexGet returns the definition of an Aerospike Vector Index. To get all
 // indexes use IndexList.
-func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
+func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "getting index")
 
@@ -327,7 +374,7 @@ func (c *AdminClient) IndexGet(ctx context.Context, namespace, name string) (*pr
 }
 
 // IndexGetStatus returns the status of an Aerospike Vector Index.
-func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
+func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "getting index status")
 
@@ -357,7 +404,7 @@ func (c *AdminClient) IndexGetStatus(ctx context.Context, namespace, name string
 }
 
 // GcInvalidVertices garbage collects invalid vertices in an Aerospike Vector Index.
-func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
+func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
 		slog.String("name", name),
@@ -395,7 +442,7 @@ func (c *AdminClient) GcInvalidVertices(ctx context.Context, namespace, name str
 }
 
 // CreateUser creates a new user with the provided username, password, and roles.
-func (c *AdminClient) CreateUser(ctx context.Context, username, password string, roles []string) error {
+func (c *Client) CreateUser(ctx context.Context, username, password string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "creating user")
 
@@ -426,7 +473,7 @@ func (c *AdminClient) CreateUser(ctx context.Context, username, password string,
 }
 
 // UpdateCredentials updates the password for the provided username.
-func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password string) error {
+func (c *Client) UpdateCredentials(ctx context.Context, username, password string) error {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "updating user credentials")
 
@@ -456,7 +503,7 @@ func (c *AdminClient) UpdateCredentials(ctx context.Context, username, password 
 }
 
 // DropUser deletes the user with the provided username.
-func (c *AdminClient) DropUser(ctx context.Context, username string) error {
+func (c *Client) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "dropping user")
 
@@ -486,7 +533,7 @@ func (c *AdminClient) DropUser(ctx context.Context, username string) error {
 }
 
 // GetUser returns the user with the provided username.
-func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.User, error) {
+func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, error) {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "getting user")
 
@@ -516,7 +563,7 @@ func (c *AdminClient) GetUser(ctx context.Context, username string) (*protos.Use
 }
 
 // ListUsers returns a list of all users.
-func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
+func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
 	c.logger.InfoContext(ctx, "listing users")
 
 	conn, err := c.channelProvider.GetRandomConn()
@@ -541,7 +588,7 @@ func (c *AdminClient) ListUsers(ctx context.Context) (*protos.ListUsersResponse,
 }
 
 // GrantRoles grants the provided roles to the user with the provided username.
-func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []string) error {
+func (c *Client) GrantRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "granting user roles")
 
@@ -572,7 +619,7 @@ func (c *AdminClient) GrantRoles(ctx context.Context, username string, roles []s
 }
 
 // RevokeRoles revokes the provided roles from the user with the provided username.
-func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []string) error {
+func (c *Client) RevokeRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "revoking user roles")
 
@@ -603,7 +650,7 @@ func (c *AdminClient) RevokeRoles(ctx context.Context, username string, roles []
 }
 
 // ListRoles returns a list of all roles.
-func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
+func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
 	c.logger.InfoContext(ctx, "listing roles")
 
 	conn, err := c.channelProvider.GetRandomConn()
@@ -629,7 +676,7 @@ func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse,
 
 // NodeIds returns a list of all the node ids that the client is connected to.
 // If a node is accessible but not a part of the cluster it will not be returned.
-func (c *AdminClient) NodeIDs(ctx context.Context) []*protos.NodeId {
+func (c *Client) NodeIDs(ctx context.Context) []*protos.NodeId {
 	c.logger.InfoContext(ctx, "getting cluster info")
 
 	ids := c.channelProvider.GetNodeIDs()
@@ -647,7 +694,7 @@ func (c *AdminClient) NodeIDs(ctx context.Context) []*protos.NodeId {
 // ConnectedNodeEndpoint returns the endpoint used to connect to a node. If
 // nodeID is nil then an endpoint used to connect to your seed (or
 // load-balancer) is used.
-func (c *AdminClient) ConnectedNodeEndpoint(
+func (c *Client) ConnectedNodeEndpoint(
 	ctx context.Context,
 	nodeID *protos.NodeId,
 ) (*protos.ServerEndpoint, error) {
@@ -694,7 +741,7 @@ func (c *AdminClient) ConnectedNodeEndpoint(
 
 // ClusteringState returns the state of the cluster according the
 // given node.  If nodeID is nil then the seed node is used.
-func (c *AdminClient) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*protos.ClusteringState, error) {
+func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*protos.ClusteringState, error) {
 	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeID", nodeID))
 
 	var (
@@ -731,7 +778,7 @@ func (c *AdminClient) ClusteringState(ctx context.Context, nodeID *protos.NodeId
 // ClusterEndpoints returns the endpoints of all the nodes in the cluster
 // according to the specified node. If nodeID is nil then the seed node is used.
 // If listenerName is nil then the default listener name is used.
-func (c *AdminClient) ClusterEndpoints(
+func (c *Client) ClusterEndpoints(
 	ctx context.Context,
 	nodeID *protos.NodeId,
 	listenerName *string,
@@ -775,7 +822,7 @@ func (c *AdminClient) ClusterEndpoints(
 
 // About returns information about the provided node. If nodeID is nil
 // then the seed node is used.
-func (c *AdminClient) About(ctx context.Context, nodeID *protos.NodeId) (*protos.AboutResponse, error) {
+func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.AboutResponse, error) {
 	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
 
 	var (
@@ -811,7 +858,7 @@ func (c *AdminClient) About(ctx context.Context, nodeID *protos.NodeId) (*protos
 
 // waitForIndexCreation waits for an index to be created and blocks until it is.
 // The amount of time to wait between each call is defined by waitInterval.
-func (c *AdminClient) waitForIndexCreation(ctx context.Context,
+func (c *Client) waitForIndexCreation(ctx context.Context,
 	namespace,
 	name string,
 	waitInterval time.Duration,
@@ -871,7 +918,7 @@ func (c *AdminClient) waitForIndexCreation(ctx context.Context,
 
 // waitForIndexDrop waits for an index to be dropped and blocks until it is. The
 // amount of time to wait between each call is defined by waitInterval.
-func (c *AdminClient) waitForIndexDrop(ctx context.Context, namespace, name string, waitInterval time.Duration) error {
+func (c *Client) waitForIndexDrop(ctx context.Context, namespace, name string, waitInterval time.Duration) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
 	conn, err := c.channelProvider.GetRandomConn()
