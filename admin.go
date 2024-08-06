@@ -628,7 +628,7 @@ func (c *AdminClient) ListRoles(ctx context.Context) (*protos.ListRolesResponse,
 }
 
 // NodeIds returns a list of all the node ids that the client is connected to.
-// If a node is accessible but not apart of the cluster it will not be returned.
+// If a node is accessible but not a part of the cluster it will not be returned.
 func (c *AdminClient) NodeIDs(ctx context.Context) []*protos.NodeId {
 	c.logger.InfoContext(ctx, "getting cluster info")
 
