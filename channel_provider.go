@@ -189,6 +189,7 @@ func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 	if len(cp.seedConns) == 0 {
 		msg := "no seed channels found"
 		cp.logger.Warn(msg)
+
 		return nil, errors.New(msg)
 	}
 
