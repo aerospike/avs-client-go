@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aerospike/avs-client-go/protos"
@@ -53,7 +54,7 @@ type channelProvider struct {
 	isLoadBalancer bool
 	token          *tokenManager
 	stopTendChan   chan struct{}
-	closed         bool
+	closed         atomic.Bool
 }
 
 // newChannelProvider creates a new channelProvider instance.
@@ -103,6 +104,7 @@ func newChannelProvider(
 		nodeConnsLock:  &sync.RWMutex{},
 		stopTendChan:   make(chan struct{}),
 		logger:         logger,
+		closed:         atomic.Bool{},
 	}
 
 	// Connect to the seed nodes.
@@ -172,14 +174,14 @@ func (cp *channelProvider) Close() error {
 	}
 
 	cp.logger.Debug("closed")
-	cp.closed = true
+	cp.closed.Store(true)
 
 	return firstErr
 }
 
 // GetSeedConn returns a gRPC client connection to a seed node.
 func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
-	if cp.closed {
+	if cp.closed.Load() {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errChannelProviderClosed
 	}
@@ -198,7 +200,7 @@ func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 // GetRandomConn returns a gRPC client connection to an Aerospike server. If
 // isLoadBalancer is enabled, it will return the seed connection.
 func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
-	if cp.closed {
+	if cp.closed.Load() {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
 	}
@@ -233,7 +235,7 @@ func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 // GetNodeConn returns a gRPC client connection to a specific node. If the node
 // ID cannot be found an error is returned.
 func (cp *channelProvider) GetNodeConn(nodeID uint64) (*grpc.ClientConn, error) {
-	if cp.closed {
+	if cp.closed.Load() {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
 	}
