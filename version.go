@@ -43,7 +43,7 @@ func (v version) String() string {
 	return s
 }
 
-func (v version) LT(b version) bool {
+func (v version) lt(b version) bool {
 	strFunc := func(x, y string) bool {
 		return x < y
 	}
@@ -54,7 +54,7 @@ func (v version) LT(b version) bool {
 	return compare(v, b, strFunc, intFunc)
 }
 
-func (v version) GT(b version) bool {
+func (v version) gt(b version) bool {
 	strFunc := func(x, y string) bool {
 		return x > y
 	}

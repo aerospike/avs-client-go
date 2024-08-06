@@ -20,6 +20,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var errChannelProviderClosed = errors.New("channel provider is closed")
+
 // channelAndEndpoints represents a combination of a gRPC client connection and server endpoints.
 type channelAndEndpoints struct {
 	Channel   *grpc.ClientConn
@@ -179,12 +181,13 @@ func (cp *channelProvider) Close() error {
 func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
-		return nil, errors.New("ChannelProvider is closed")
+		return nil, errChannelProviderClosed
 	}
 
 	if len(cp.seedConns) == 0 {
-		cp.logger.Warn("no seed channels found")
-		return nil, errors.New("no seed channels found")
+		msg := "no seed channels found"
+		cp.logger.Warn(msg)
+		return nil, errors.New(msg)
 	}
 
 	idx := rand.Intn(len(cp.seedConns)) //nolint:gosec // Security is not an issue here
@@ -227,6 +230,8 @@ func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 	return discoverdChannels[idx].Channel, nil
 }
 
+// GetNodeConn returns a gRPC client connection to a specific node. If the node
+// ID cannot be found an error is returned.
 func (cp *channelProvider) GetNodeConn(nodeID uint64) (*grpc.ClientConn, error) {
 	if cp.closed {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
@@ -252,6 +257,8 @@ func (cp *channelProvider) GetNodeConn(nodeID uint64) (*grpc.ClientConn, error) 
 	return channel.Channel, nil
 }
 
+// GetNodeIDs returns the node IDs of all nodes discovered during cluster
+// tending. If tending is disabled (LB true) then no node IDs are returned.
 func (cp *channelProvider) GetNodeIDs() []uint64 {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
@@ -328,7 +335,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 					return
 				}
 
-				if newVersion(about.Version).LT(minimumSupportedAVSVersion) {
+				if newVersion(about.Version).lt(minimumSupportedAVSVersion) {
 					logger.WarnContext(ctx, "incompatible server version", slog.String("version", about.Version))
 				}
 			}
@@ -473,7 +480,7 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 	return maxTempEndpoints
 }
 
-// checkAndSetNodeConns checks if the node connections need to be updated and updates them if necessary.
+// Checks if the node connections need to be updated and updates them if necessary.
 func (cp *channelProvider) checkAndSetNodeConns(
 	ctx context.Context,
 	newNodeEndpoints map[uint64]*protos.ServerEndpointList,
