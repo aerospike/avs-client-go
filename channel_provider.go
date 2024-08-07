@@ -23,17 +23,43 @@ import (
 
 var errChannelProviderClosed = errors.New("channel provider is closed")
 
+// connection represents a gRPC client connection and all the clients (stubs)
+// for the various AVS services. It's main purpose to remove the need to create
+// multiple clients for the same connection.
+type connection struct {
+	grpcConn          *grpc.ClientConn
+	transactClient    protos.TransactServiceClient
+	authClient        protos.AuthServiceClient
+	userAdminClient   protos.UserAdminServiceClient
+	indexClient       protos.IndexServiceClient
+	aboutClient       protos.AboutServiceClient
+	clusterInfoClient protos.ClusterInfoServiceClient
+}
+
+// newConnection creates a new connection instance.
+func newConnection(conn *grpc.ClientConn) *connection {
+	return &connection{
+		grpcConn:          conn,
+		transactClient:    protos.NewTransactServiceClient(conn),
+		authClient:        protos.NewAuthServiceClient(conn),
+		userAdminClient:   protos.NewUserAdminServiceClient(conn),
+		indexClient:       protos.NewIndexServiceClient(conn),
+		aboutClient:       protos.NewAboutServiceClient(conn),
+		clusterInfoClient: protos.NewClusterInfoServiceClient(conn),
+	}
+}
+
 // channelAndEndpoints represents a combination of a gRPC client connection and server endpoints.
 type channelAndEndpoints struct {
-	Channel   *grpc.ClientConn
-	Endpoints *protos.ServerEndpointList
+	channel   *connection
+	endpoints *protos.ServerEndpointList
 }
 
 // newConnAndEndpoints creates a new channelAndEndpoints instance.
-func newConnAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
+func newConnAndEndpoints(channel *connection, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
 	return &channelAndEndpoints{
-		Channel:   channel,
-		Endpoints: endpoints,
+		channel:   channel,
+		endpoints: endpoints,
 	}
 }
 
@@ -44,7 +70,7 @@ func newConnAndEndpoints(channel *grpc.ClientConn, endpoints *protos.ServerEndpo
 type channelProvider struct {
 	logger         *slog.Logger
 	nodeConns      map[uint64]*channelAndEndpoints
-	seedConns      []*grpc.ClientConn
+	seedConns      []*connection
 	tlsConfig      *tls.Config
 	seeds          HostPortSlice
 	nodeConnsLock  *sync.RWMutex
@@ -146,7 +172,7 @@ func (cp *channelProvider) Close() error {
 	}
 
 	for _, channel := range cp.seedConns {
-		err := channel.Close()
+		err := channel.grpcConn.Close()
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -154,13 +180,13 @@ func (cp *channelProvider) Close() error {
 
 			cp.logger.Error("failed to close seed channel",
 				slog.Any("error", err),
-				slog.String("seed", channel.Target()),
+				slog.String("seed", channel.grpcConn.Target()),
 			)
 		}
 	}
 
 	for _, channel := range cp.nodeConns {
-		err := channel.Channel.Close()
+		err := channel.channel.grpcConn.Close()
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -168,7 +194,7 @@ func (cp *channelProvider) Close() error {
 
 			cp.logger.Error("failed to close node channel",
 				slog.Any("error", err),
-				slog.String("node", channel.Channel.Target()),
+				slog.String("node", channel.channel.grpcConn.Target()),
 			)
 		}
 	}
@@ -180,7 +206,7 @@ func (cp *channelProvider) Close() error {
 }
 
 // GetSeedConn returns a gRPC client connection to a seed node.
-func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
+func (cp *channelProvider) GetSeedConn() (*connection, error) {
 	if cp.closed.Load() {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errChannelProviderClosed
@@ -200,7 +226,7 @@ func (cp *channelProvider) GetSeedConn() (*grpc.ClientConn, error) {
 
 // GetRandomConn returns a gRPC client connection to an Aerospike server. If
 // isLoadBalancer is enabled, it will return the seed connection.
-func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
+func (cp *channelProvider) GetRandomConn() (*connection, error) {
 	if cp.closed.Load() {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
@@ -230,12 +256,12 @@ func (cp *channelProvider) GetRandomConn() (*grpc.ClientConn, error) {
 
 	idx := rand.Intn(len(discoverdChannels)) //nolint:gosec // Security is not an issue here
 
-	return discoverdChannels[idx].Channel, nil
+	return discoverdChannels[idx].channel, nil
 }
 
 // GetNodeConn returns a gRPC client connection to a specific node. If the node
 // ID cannot be found an error is returned.
-func (cp *channelProvider) GetNodeConn(nodeID uint64) (*grpc.ClientConn, error) {
+func (cp *channelProvider) GetNodeConn(nodeID uint64) (*connection, error) {
 	if cp.closed.Load() {
 		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
 		return nil, errors.New("ChannelProvider is closed")
@@ -257,7 +283,7 @@ func (cp *channelProvider) GetNodeConn(nodeID uint64) (*grpc.ClientConn, error) 
 		return nil, errors.New(msg)
 	}
 
-	return channel.Channel, nil
+	return channel.channel, nil
 }
 
 // GetNodeIDs returns the node IDs of all nodes discovered during cluster
@@ -287,8 +313,8 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 	var authErr error
 
 	wg := sync.WaitGroup{}
-	seedCons := make(chan *grpc.ClientConn)
-	cp.seedConns = []*grpc.ClientConn{}
+	seedGrpcConns := make(chan *grpc.ClientConn)
+	cp.seedConns = []*connection{}
 	tokenLock := sync.Mutex{} // Ensures only one thread attempts to update token at a time
 	tokenUpdated := false     // Ensures token update only occurs once
 
@@ -300,7 +326,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 
 			logger := cp.logger.With(slog.String("host", seed.String()))
 
-			conn, err := cp.createChannel(seed)
+			grpcConn, err := cp.createGrcpConn(seed)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create channel", slog.Any("error", err))
 				return
@@ -313,7 +339,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 				// succeed others will block
 				tokenLock.Lock()
 				if !tokenUpdated {
-					err := cp.token.RefreshToken(ctx, conn)
+					err := cp.token.RefreshToken(ctx, grpcConn)
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
@@ -330,7 +356,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 			}
 
 			if extraCheck {
-				client := protos.NewAboutServiceClient(conn)
+				client := protos.NewAboutServiceClient(grpcConn)
 
 				about, err := client.Get(ctx, &protos.AboutRequest{})
 				if err != nil {
@@ -343,17 +369,17 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 				}
 			}
 
-			seedCons <- conn
+			seedGrpcConns <- grpcConn
 		}(seed)
 	}
 
 	go func() {
 		wg.Wait()
-		close(seedCons)
+		close(seedGrpcConns)
 	}()
 
-	for conn := range seedCons {
-		cp.seedConns = append(cp.seedConns, conn)
+	for conn := range seedGrpcConns {
+		cp.seedConns = append(cp.seedConns, newConnection(conn))
 	}
 
 	if len(cp.seedConns) == 0 {
@@ -384,9 +410,7 @@ func (cp *channelProvider) updateNodeConns(
 		return err
 	}
 
-	client := protos.NewAboutServiceClient(newConn)
-	_, err = client.Get(ctx, &protos.AboutRequest{})
-
+	_, err = newConn.aboutClient.Get(ctx, &protos.AboutRequest{})
 	if err != nil {
 		return err
 	}
@@ -417,12 +441,12 @@ func (cp *channelProvider) getTendConns() []*grpc.ClientConn {
 	i := 0
 
 	for _, channel := range cp.seedConns {
-		channels[i] = channel
+		channels[i] = channel.grpcConn
 		i++
 	}
 
 	for _, channel := range cp.nodeConns {
-		channels[i] = channel.Channel
+		channels[i] = channel.channel.grpcConn
 		i++
 	}
 
@@ -503,10 +527,10 @@ func (cp *channelProvider) checkAndSetNodeConns(
 			cp.nodeConnsLock.RUnlock()
 
 			if ok {
-				if !endpointListEqual(currEndpoints.Endpoints, newEndpoints) {
+				if !endpointListEqual(currEndpoints.endpoints, newEndpoints) {
 					logger.Debug("endpoints for node changed, recreating channel")
 
-					err := currEndpoints.Channel.Close()
+					err := currEndpoints.channel.grpcConn.Close()
 					if err != nil {
 						logger.Warn("failed to close channel", slog.Any("error", err))
 					}
@@ -542,7 +566,7 @@ func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	// The cluster state changed. Remove old channels.
 	for node, channelEndpoints := range cp.nodeConns {
 		if _, ok := newNodeEndpoints[node]; !ok {
-			err := channelEndpoints.Channel.Close()
+			err := channelEndpoints.channel.grpcConn.Close()
 			if err != nil {
 				cp.logger.Warn("failed to close channel", slog.Uint64("node", node), slog.Any("error", err))
 			}
@@ -640,9 +664,9 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
-// createConnFromEndpoints creates a gRPC client connection from the first
+// createGrpcConnFromEndpoints creates a gRPC client connection from the first
 // successful endpoint in endpoints.
-func (cp *channelProvider) createConnFromEndpoints(
+func (cp *channelProvider) createGrpcConnFromEndpoints(
 	endpoints *protos.ServerEndpointList,
 ) (*grpc.ClientConn, error) {
 	for _, endpoint := range endpoints.Endpoints {
@@ -650,7 +674,7 @@ func (cp *channelProvider) createConnFromEndpoints(
 			continue // TODO: Add logging and support for IPv6
 		}
 
-		conn, err := cp.createChannel(endpointToHostPort(endpoint))
+		conn, err := cp.createGrcpConn(endpointToHostPort(endpoint))
 
 		if err == nil {
 			return conn, nil
@@ -660,9 +684,9 @@ func (cp *channelProvider) createConnFromEndpoints(
 	return nil, errors.New("no valid endpoint found")
 }
 
-// createChannel creates a gRPC client connection to a host. This handles adding
+// createGrcpConn creates a gRPC client connection to a host. This handles adding
 // credential and configuring tls.
-func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, error) {
+func (cp *channelProvider) createGrcpConn(hostPort *HostPort) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {
@@ -691,4 +715,13 @@ func (cp *channelProvider) createChannel(hostPort *HostPort) (*grpc.ClientConn, 
 	}
 
 	return conn, nil
+}
+
+func (cp *channelProvider) createConnFromEndpoints(endpoints *protos.ServerEndpointList) (*connection, error) {
+	conn, err := cp.createGrpcConnFromEndpoints(endpoints)
+	if err != nil {
+		return nil, err
+	}
+
+	return newConnection(conn), nil
 }
