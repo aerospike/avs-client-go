@@ -4,13 +4,14 @@ package avs
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"io"
 	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/aerospike/avs-client-go/protos"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -37,7 +38,7 @@ type Client struct {
 //   - password: The password to authenticate with.
 //   - tlsConfig: The TLS configuration to use for the connection.
 //   - logger: The logger to use for logging.
-func NewAdminClient(
+func NewClient(
 	ctx context.Context,
 	seeds HostPortSlice,
 	listenerName *string,
@@ -73,6 +74,41 @@ func NewAdminClient(
 func (c *Client) Close() {
 	c.logger.Info("Closing client")
 	c.channelProvider.Close()
+}
+
+func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		c.logger.Error("failed to insert record", slog.Any("error", err))
+		return err
+	}
+
+	putReq := &protos.PutRequest{
+		Key: &protos.Key{
+			Namespace: namespace,
+			Set:       set,
+			Value:     protos.ConvertToKey(key),
+		},
+		WriteType:          writeType,
+		Fields:             protos.ConvertToFields(recordData),
+		IgnoreMemQueueFull: ignoreMemQueueFull,
+	}
+
+	_, err = conn.transactClient.Put(ctx, putReq)
+
+	return err
+}
+
+func (c *Client) Insert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	return c.put(ctx, protos.WriteType_INSERT_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
+}
+
+func (c *Client) Update(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	return c.put(ctx, protos.WriteType_UPDATE_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
+}
+
+func (c *Client) Upsert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	return c.put(ctx, protos.WriteType_UPSERT, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
 //nolint:revive // TODO
@@ -112,9 +148,54 @@ func (c *Client) VectorSearch(ctx context.Context,
 	query []float32,
 	limit int,
 	searchParams *protos.HnswSearchParams,
-	binNames []string,
+	projections *protos.ProjectionSpec,
 ) ([]*protos.Neighbor, error) {
-	return nil, ErrNotImplemented
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		c.logger.Error("failed to search for vector", slog.Any("error", err))
+		return nil, err
+	}
+
+	vectorSearchReq := &protos.VectorSearchRequest{
+		Index: &protos.IndexId{
+			Namespace: namespace,
+			Name:      indexName,
+		},
+		QueryVector: &protos.Vector{
+			Data: &protos.Vector_FloatData{
+				FloatData: &protos.FloatData{
+					Value: query,
+				},
+			},
+		},
+		Limit: uint32(limit),
+		SearchParams: &protos.VectorSearchRequest_HnswSearchParams{
+			HnswSearchParams: searchParams,
+		},
+		Projection: projections,
+	}
+
+	resp, err := conn.transactClient.VectorSearch(ctx, vectorSearchReq)
+	if err != nil {
+		c.logger.Error("failed to search for vector", slog.Any("error", err))
+		return nil, err
+	}
+
+	neighbors := make([]*protos.Neighbor, 0, limit)
+
+	for {
+		n, err := resp.Recv()
+
+		if err != nil {
+			if err != io.EOF {
+				return neighbors, fmt.Errorf("failed to receive all neighbor: %w", err)
+			}
+
+			return neighbors, nil
+		}
+
+		neighbors = append(neighbors, n)
+	}
 }
 
 //nolint:revive // TODO
@@ -218,9 +299,7 @@ func (c *Client) IndexCreateFromIndexDef(
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewIndexServiceClient(conn)
-
-	_, err = client.Create(ctx, indexDef)
+	_, err = conn.indexClient.Create(ctx, indexDef)
 	if err != nil {
 		msg := "failed to create index"
 		logger.Error(msg, slog.Any("error", err))
@@ -266,9 +345,7 @@ func (c *Client) IndexUpdate(
 		},
 	}
 
-	client := protos.NewIndexServiceClient(conn)
-
-	_, err = client.Update(ctx, indexUpdate)
+	_, err = conn.indexClient.Update(ctx, indexUpdate)
 	if err != nil {
 		msg := "failed to update index"
 		logger.Error(msg, slog.Any("error", err))
@@ -297,9 +374,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 		Name:      name,
 	}
 
-	client := protos.NewIndexServiceClient(conn)
-
-	_, err = client.Drop(ctx, indexID)
+	_, err = conn.indexClient.Drop(ctx, indexID)
 	if err != nil {
 		msg := "failed to drop index"
 
@@ -328,9 +403,7 @@ func (c *Client) IndexList(ctx context.Context) (*protos.IndexDefinitionList, er
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewIndexServiceClient(conn)
-
-	indexList, err := client.List(ctx, nil)
+	indexList, err := conn.indexClient.List(ctx, nil)
 	if err != nil {
 		msg := "failed to get indexes"
 
@@ -360,9 +433,8 @@ func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.
 		Namespace: namespace,
 		Name:      name,
 	}
-	client := protos.NewIndexServiceClient(conn)
 
-	indexDef, err := client.Get(ctx, indexID)
+	indexDef, err := conn.indexClient.Get(ctx, indexID)
 	if err != nil {
 		msg := "failed to get index"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -390,9 +462,8 @@ func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*p
 		Namespace: namespace,
 		Name:      name,
 	}
-	client := protos.NewIndexServiceClient(conn)
 
-	indexStatus, err := client.GetStatus(ctx, indexID)
+	indexStatus, err := conn.indexClient.GetStatus(ctx, indexID)
 	if err != nil {
 		msg := "failed to get index status"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -428,9 +499,8 @@ func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, 
 		},
 		CutoffTimestamp: cutoffTime.Unix(),
 	}
-	client := protos.NewIndexServiceClient(conn)
 
-	_, err = client.GcInvalidVertices(ctx, gcRequest)
+	_, err = conn.indexClient.GcInvalidVertices(ctx, gcRequest)
 	if err != nil {
 		msg := "failed to garbage collect invalid vertices"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -454,14 +524,12 @@ func (c *Client) CreateUser(ctx context.Context, username, password string, role
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
 	addUserRequest := &protos.AddUserRequest{
 		Credentials: createUserPassCredential(username, password),
 		Roles:       roles,
 	}
 
-	_, err = client.AddUser(ctx, addUserRequest)
+	_, err = conn.userAdminClient.AddUser(ctx, addUserRequest)
 	if err != nil {
 		msg := "failed to create user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -485,13 +553,11 @@ func (c *Client) UpdateCredentials(ctx context.Context, username, password strin
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
 	updatedCredRequest := &protos.UpdateCredentialsRequest{
 		Credentials: createUserPassCredential(username, password),
 	}
 
-	_, err = client.UpdateCredentials(ctx, updatedCredRequest)
+	_, err = conn.userAdminClient.UpdateCredentials(ctx, updatedCredRequest)
 	if err != nil {
 		msg := "failed to update user credentials"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -515,13 +581,11 @@ func (c *Client) DropUser(ctx context.Context, username string) error {
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
 	dropUserRequest := &protos.DropUserRequest{
 		Username: username,
 	}
 
-	_, err = client.DropUser(ctx, dropUserRequest)
+	_, err = conn.userAdminClient.DropUser(ctx, dropUserRequest)
 	if err != nil {
 		msg := "failed to drop user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -545,13 +609,11 @@ func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, er
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
 	getUserRequest := &protos.GetUserRequest{
 		Username: username,
 	}
 
-	userResp, err := client.GetUser(ctx, getUserRequest)
+	userResp, err := conn.userAdminClient.GetUser(ctx, getUserRequest)
 	if err != nil {
 		msg := "failed to get user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -574,9 +636,7 @@ func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, erro
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
-	usersResp, err := client.ListUsers(ctx, &emptypb.Empty{})
+	usersResp, err := conn.userAdminClient.ListUsers(ctx, &emptypb.Empty{})
 	if err != nil {
 		msg := "failed to lists users"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -600,14 +660,12 @@ func (c *Client) GrantRoles(ctx context.Context, username string, roles []string
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
 	grantRolesRequest := &protos.GrantRolesRequest{
 		Username: username,
 		Roles:    roles,
 	}
 
-	_, err = client.GrantRoles(ctx, grantRolesRequest)
+	_, err = conn.userAdminClient.GrantRoles(ctx, grantRolesRequest)
 	if err != nil {
 		msg := "failed to grant user roles"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -631,14 +689,12 @@ func (c *Client) RevokeRoles(ctx context.Context, username string, roles []strin
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
 	revokeRolesReq := &protos.RevokeRolesRequest{
 		Username: username,
 		Roles:    roles,
 	}
 
-	_, err = client.RevokeRoles(ctx, revokeRolesReq)
+	_, err = conn.userAdminClient.RevokeRoles(ctx, revokeRolesReq)
 	if err != nil {
 		msg := "failed to revoke user roles"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -661,9 +717,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewUserAdminServiceClient(conn)
-
-	rolesResp, err := client.ListRoles(ctx, &emptypb.Empty{})
+	rolesResp, err := conn.userAdminClient.ListRoles(ctx, &emptypb.Empty{})
 	if err != nil {
 		msg := "failed to lists roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -701,7 +755,7 @@ func (c *Client) ConnectedNodeEndpoint(
 	c.logger.InfoContext(ctx, "getting connected endpoint for node", slog.Any("nodeID", nodeID))
 
 	var (
-		conn *grpc.ClientConn
+		conn *connection
 		err  error
 	)
 
@@ -718,7 +772,7 @@ func (c *Client) ConnectedNodeEndpoint(
 		return nil, NewAVSError(msg)
 	}
 
-	splitEndpoint := strings.Split(conn.Target(), ":")
+	splitEndpoint := strings.Split(conn.grpcConn.Target(), ":")
 
 	resp := protos.ServerEndpoint{
 		Address: splitEndpoint[0],
@@ -745,7 +799,7 @@ func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*p
 	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeID", nodeID))
 
 	var (
-		conn *grpc.ClientConn
+		conn *connection
 		err  error
 	)
 
@@ -762,9 +816,7 @@ func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*p
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewClusterInfoServiceClient(conn)
-
-	state, err := client.GetClusteringState(ctx, &emptypb.Empty{})
+	state, err := conn.clusterInfoClient.GetClusteringState(ctx, &emptypb.Empty{})
 	if err != nil {
 		msg := "failed to get clustering state"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -786,7 +838,7 @@ func (c *Client) ClusterEndpoints(
 	c.logger.InfoContext(ctx, "getting cluster endpoints for node", slog.Any("nodeID", nodeID))
 
 	var (
-		conn *grpc.ClientConn
+		conn *connection
 		err  error
 	)
 
@@ -803,9 +855,7 @@ func (c *Client) ClusterEndpoints(
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewClusterInfoServiceClient(conn)
-
-	endpoints, err := client.GetClusterEndpoints(ctx,
+	endpoints, err := conn.clusterInfoClient.GetClusterEndpoints(ctx,
 		&protos.ClusterNodeEndpointsRequest{
 			ListenerName: listenerName,
 		},
@@ -826,7 +876,7 @@ func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.Abou
 	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
 
 	var (
-		conn *grpc.ClientConn
+		conn *connection
 		err  error
 	)
 
@@ -843,9 +893,7 @@ func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.Abou
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	client := protos.NewAboutServiceClient(conn)
-
-	resp, err := client.Get(ctx, &protos.AboutRequest{})
+	resp, err := conn.aboutClient.Get(ctx, &protos.AboutRequest{})
 	if err != nil {
 		msg := "failed to make about request"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -878,15 +926,12 @@ func (c *Client) waitForIndexCreation(ctx context.Context,
 		Name:      name,
 	}
 
-	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
 
 	defer timer.Stop()
 
-	defer timer.Stop()
-
 	for {
-		_, err := client.GetStatus(ctx, indexID)
+		_, err := conn.indexClient.GetStatus(ctx, indexID)
 		if err != nil {
 			code := status.Code(err)
 			if code == codes.Unavailable || code == codes.NotFound {
@@ -934,15 +979,12 @@ func (c *Client) waitForIndexDrop(ctx context.Context, namespace, name string, w
 		Name:      name,
 	}
 
-	client := protos.NewIndexServiceClient(conn)
 	timer := time.NewTimer(waitInterval)
 
 	defer timer.Stop()
 
-	defer timer.Stop()
-
 	for {
-		_, err := client.GetStatus(ctx, indexID)
+		_, err := conn.indexClient.GetStatus(ctx, indexID)
 		if err != nil {
 			code := status.Code(err)
 			if code == codes.Unavailable || code == codes.NotFound {

@@ -59,16 +59,6 @@ func (tm *tokenManager) setRefreshTimeFromTTL(ttl time.Duration) {
 	tm.refreshTime.Store(time.Now().Add(ttl))
 }
 
-// expired checks if the token has expired.
-func (tm *tokenManager) expired() bool {
-	expiredTime := tm.refreshTime.Load()
-	if expiredTime == nil {
-		return true
-	}
-
-	return time.Now().After(expiredTime.(time.Time))
-}
-
 // RefreshToken refreshes the authentication token using the provided gRPC client connection.
 // It returns a boolean indicating if the token was successfully refreshed and
 // an error if any. It is not thread safe.
@@ -130,7 +120,7 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 // ScheduleRefresh schedules the token refresh using the provided function to
 // get the gRPC client connection. This is not threadsafe. It should only be
 // called once.
-func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)) {
+func (tm *tokenManager) ScheduleRefresh(getConn func() (*connection, error)) {
 	if tm.refreshScheduled {
 		tm.logger.Warn("refresh already scheduled")
 	}
@@ -142,14 +132,14 @@ func (tm *tokenManager) ScheduleRefresh(getConn func() (*grpc.ClientConn, error)
 
 	go func() {
 		for {
-			conn, err := getConn()
+			connClients, err := getConn()
 			if err != nil {
 				tm.logger.Warn("failed to refresh token", slog.Any("error", err))
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-			err = tm.RefreshToken(ctx, conn)
+			err = tm.RefreshToken(ctx, connClients.grpcConn)
 			if err != nil {
 				tm.logger.Warn("failed to refresh token", slog.Any("error", err))
 			}
