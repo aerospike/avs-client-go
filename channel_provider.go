@@ -51,14 +51,14 @@ func newConnection(conn *grpc.ClientConn) *connection {
 
 // channelAndEndpoints represents a combination of a gRPC client connection and server endpoints.
 type channelAndEndpoints struct {
-	channel   *connection
+	conn      *connection
 	endpoints *protos.ServerEndpointList
 }
 
 // newConnAndEndpoints creates a new channelAndEndpoints instance.
 func newConnAndEndpoints(channel *connection, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
 	return &channelAndEndpoints{
-		channel:   channel,
+		conn:      channel,
 		endpoints: endpoints,
 	}
 }
@@ -185,8 +185,8 @@ func (cp *channelProvider) Close() error {
 		}
 	}
 
-	for _, channel := range cp.nodeConns {
-		err := channel.channel.grpcConn.Close()
+	for _, conn := range cp.nodeConns {
+		err := conn.conn.grpcConn.Close()
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -194,7 +194,7 @@ func (cp *channelProvider) Close() error {
 
 			cp.logger.Error("failed to close node channel",
 				slog.Any("error", err),
-				slog.String("node", channel.channel.grpcConn.Target()),
+				slog.String("node", conn.conn.grpcConn.Target()),
 			)
 		}
 	}
@@ -256,7 +256,7 @@ func (cp *channelProvider) GetRandomConn() (*connection, error) {
 
 	idx := rand.Intn(len(discoverdChannels)) //nolint:gosec // Security is not an issue here
 
-	return discoverdChannels[idx].channel, nil
+	return discoverdChannels[idx].conn, nil
 }
 
 // GetNodeConn returns a gRPC client connection to a specific node. If the node
@@ -283,7 +283,7 @@ func (cp *channelProvider) GetNodeConn(nodeID uint64) (*connection, error) {
 		return nil, errors.New(msg)
 	}
 
-	return channel.channel, nil
+	return channel.conn, nil
 }
 
 // GetNodeIDs returns the node IDs of all nodes discovered during cluster
@@ -446,7 +446,7 @@ func (cp *channelProvider) getTendConns() []*grpc.ClientConn {
 	}
 
 	for _, channel := range cp.nodeConns {
-		channels[i] = channel.channel.grpcConn
+		channels[i] = channel.conn.grpcConn
 		i++
 	}
 
@@ -530,7 +530,7 @@ func (cp *channelProvider) checkAndSetNodeConns(
 				if !endpointListEqual(currEndpoints.endpoints, newEndpoints) {
 					logger.Debug("endpoints for node changed, recreating channel")
 
-					err := currEndpoints.channel.grpcConn.Close()
+					err := currEndpoints.conn.grpcConn.Close()
 					if err != nil {
 						logger.Warn("failed to close channel", slog.Any("error", err))
 					}
@@ -566,7 +566,7 @@ func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	// The cluster state changed. Remove old channels.
 	for node, channelEndpoints := range cp.nodeConns {
 		if _, ok := newNodeEndpoints[node]; !ok {
-			err := channelEndpoints.channel.grpcConn.Close()
+			err := channelEndpoints.conn.grpcConn.Close()
 			if err != nil {
 				cp.logger.Warn("failed to close channel", slog.Uint64("node", node), slog.Any("error", err))
 			}

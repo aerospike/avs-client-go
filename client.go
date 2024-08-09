@@ -71,15 +71,20 @@ func NewClient(
 }
 
 // Close closes the AdminClient and releases any resources associated with it.
-func (c *Client) Close() {
+func (c *Client) Close() error {
 	c.logger.Info("Closing client")
-	c.channelProvider.Close()
+	return c.channelProvider.Close()
 }
 
 func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.Any("key", key),
+	)
+
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		c.logger.Error("failed to insert record", slog.Any("error", err))
+		logger.Error("failed to insert record", slog.Any("error", err))
 		return err
 	}
 
@@ -100,84 +105,165 @@ func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace 
 }
 
 func (c *Client) Insert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	c.logger.InfoContext(ctx, "inserting record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_INSERT_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
 func (c *Client) Update(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	c.logger.InfoContext(ctx, "updating record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_UPDATE_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
 func (c *Client) Upsert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+	c.logger.InfoContext(ctx, "upserting record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_UPSERT, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
 //nolint:revive // TODO
 func (c *Client) Get(ctx context.Context,
-	namespace,
-	setName string,
+	namespace string,
+	set *string,
 	key any,
-	binNames []string,
-) (*protos.Record, error) {
-	return nil, ErrNotImplemented
+	includeFields []string,
+	excludeFields []string,
+) (*Record, error) {
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.Any("key", key),
+	)
+	logger.InfoContext(ctx, "getting record")
+
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		logger.Error("failed to get record", slog.Any("error", err))
+		return nil, err
+	}
+
+	getReq := &protos.GetRequest{
+		Key: &protos.Key{
+			Namespace: namespace,
+			Set:       set,
+			Value:     protos.ConvertToKey(key),
+		},
+		Projection: createProjectionSpec(includeFields, excludeFields),
+	}
+
+	record, err := conn.transactClient.Get(ctx, getReq)
+	// TODO handle err
+	return newRecordFromProto(record), err
 }
 
 //nolint:revive // TODO
-func (c *Client) Delete(ctx context.Context, namespace, setName string, key any) (*protos.Record, error) {
-	return nil, ErrNotImplemented
+func (c *Client) Delete(ctx context.Context, namespace string, set *string, key any) error {
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.Any("key", key),
+	)
+	logger.InfoContext(ctx, "deleting record")
+
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		logger.Error("failed to delete record", slog.Any("error", err))
+		return err
+	}
+
+	getReq := &protos.DeleteRequest{
+		Key: &protos.Key{
+			Namespace: namespace,
+			Set:       set,
+			Value:     protos.ConvertToKey(key),
+		},
+	}
+
+	_, err = conn.transactClient.Delete(ctx, getReq)
+
+	return err
 }
 
 //nolint:revive // TODO
 func (c *Client) Exists(
 	ctx context.Context,
-	namespace,
-	setName string,
+	namespace string,
+	set *string,
 	key any,
 ) (bool, error) {
-	return false, ErrNotImplemented
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.Any("key", key),
+	)
+	logger.InfoContext(ctx, "checking if record exists")
+
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		logger.Error("failed to check if record exists", slog.Any("error", err))
+		return false, err
+	}
+
+	existsReq := &protos.ExistsRequest{
+		Key: &protos.Key{
+			Namespace: namespace,
+			Set:       set,
+			Value:     protos.ConvertToKey(key),
+		},
+	}
+
+	boolean, err := conn.transactClient.Exists(ctx, existsReq)
+
+	return boolean.GetValue(), err
 }
 
 //nolint:revive // TODO
-func (c *Client) IsIndexed(ctx context.Context, namespace, setName, indexName string, key any) (bool, error) {
-	return false, ErrNotImplemented
+func (c *Client) IsIndexed(ctx context.Context, namespace string, set *string, indexName string, key any) (bool, error) {
+	logger := c.logger.With(
+		slog.String("namespace", namespace),
+		slog.String("indexName", indexName),
+		slog.Any("key", key),
+	)
+	logger.InfoContext(ctx, "checking if record is indexed")
+
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		logger.Error("failed to check if record is indexed", slog.Any("error", err))
+		return false, err
+	}
+
+	isIndexedReq := &protos.IsIndexedRequest{
+		Key: &protos.Key{
+			Namespace: namespace,
+			Set:       set,
+			Value:     protos.ConvertToKey(key),
+		},
+	}
+
+	boolean, err := conn.transactClient.IsIndexed(ctx, isIndexedReq)
+
+	return boolean.GetValue(), err
 }
 
-//nolint:revive // TODO
-func (c *Client) VectorSearch(ctx context.Context,
+// vectorSearch searches for the nearest neighbors of the query vector in the
+// specified index. It only deals with the protos.Vector type and is not
+// intended to be exported.
+func (c *Client) vectorSearch(ctx context.Context,
 	namespace,
 	indexName string,
-	query []float32,
-	limit int,
+	vector *protos.Vector,
+	limit uint32,
 	searchParams *protos.HnswSearchParams,
 	projections *protos.ProjectionSpec,
 ) ([]*protos.Neighbor, error) {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
+
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		c.logger.Error("failed to search for vector", slog.Any("error", err))
+		logger.Error("failed to search for vector", slog.Any("error", err))
 		return nil, err
 	}
 
-	vectorSearchReq := &protos.VectorSearchRequest{
-		Index: &protos.IndexId{
-			Namespace: namespace,
-			Name:      indexName,
-		},
-		QueryVector: &protos.Vector{
-			Data: &protos.Vector_FloatData{
-				FloatData: &protos.FloatData{
-					Value: query,
-				},
-			},
-		},
-		Limit: uint32(limit),
-		SearchParams: &protos.VectorSearchRequest_HnswSearchParams{
-			HnswSearchParams: searchParams,
-		},
-		Projection: projections,
-	}
+	vectorSearchReq := createVectorSearchRequest(namespace, indexName, vector, limit, searchParams, projections)
 
 	resp, err := conn.transactClient.VectorSearch(ctx, vectorSearchReq)
 	if err != nil {
-		c.logger.Error("failed to search for vector", slog.Any("error", err))
+		logger.Error("failed to search for vector", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -188,7 +274,8 @@ func (c *Client) VectorSearch(ctx context.Context,
 
 		if err != nil {
 			if err != io.EOF {
-				return neighbors, fmt.Errorf("failed to receive all neighbor: %w", err)
+				logger.Error("failed to receive all neighbors", slog.Any("error", err))
+				return neighbors, fmt.Errorf("failed to receive all neighbors: %w", err)
 			}
 
 			return neighbors, nil
@@ -196,6 +283,52 @@ func (c *Client) VectorSearch(ctx context.Context,
 
 		neighbors = append(neighbors, n)
 	}
+}
+
+// VectorSearchFloat32 searches for the nearest neighbors of the query vector in the
+// specified index. It takes the following parameters:
+//   - namespace: The namespace of the index.
+//   - indexName: The name of the index.
+//   - query: The query vector.
+//   - limit: The maximum number of neighbors to return.
+//   - searchParams: Extra options sent to the server to configure behavior of the
+//     HNSW algorithm.
+//   - projections: Extra options to configure the behavior of the which keys
+func (c *Client) VectorSearchFloat32(ctx context.Context,
+	namespace,
+	indexName string,
+	query []float32,
+	limit uint32,
+	searchParams *protos.HnswSearchParams,
+	projections *protos.ProjectionSpec,
+) ([]*protos.Neighbor, error) {
+	c.logger.InfoContext(ctx, "searching for float vector")
+
+	vector := protos.CreateFloat32Vector(query)
+	return c.vectorSearch(ctx, namespace, indexName, vector, limit, searchParams, projections)
+}
+
+// VectorSearchBool searches for the nearest neighbors of the query vector in the
+// specified index. It takes the following parameters:
+//   - namespace: The namespace of the index.
+//   - indexName: The name of the index.
+//   - query: The query vector.
+//   - limit: The maximum number of neighbors to return.
+//   - searchParams: Extra options sent to the server to configure behavior of the
+//     HNSW algorithm.
+//   - projections: Extra options to configure the behavior of the which keys
+func (c *Client) VectorSearchBool(ctx context.Context,
+	namespace,
+	indexName string,
+	query []bool,
+	limit uint32,
+	searchParams *protos.HnswSearchParams,
+	projections *protos.ProjectionSpec,
+) ([]*protos.Neighbor, error) {
+	c.logger.InfoContext(ctx, "searching for bool vector")
+
+	vector := protos.CreateBoolVector(query)
+	return c.vectorSearch(ctx, namespace, indexName, vector, limit, searchParams, projections)
 }
 
 //nolint:revive // TODO

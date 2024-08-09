@@ -43,6 +43,33 @@ func ConvertToValue(value any) *Value {
 	}
 }
 
+func ConvertFromValue(value *Value) any {
+	switch v := value.Value.(type) {
+	case *Value_StringValue:
+		return v.StringValue
+	case *Value_BytesValue:
+		return v.BytesValue
+	case *Value_IntValue:
+		return v.IntValue
+	case *Value_LongValue:
+		return v.LongValue
+	case *Value_FloatValue:
+		return v.FloatValue
+	case *Value_DoubleValue:
+		return v.DoubleValue
+	case *Value_MapValue:
+		return v.MapValue
+	case *Value_ListValue:
+		return v.ListValue
+	case *Value_VectorValue:
+		return v.VectorValue
+	case *Value_BooleanValue:
+		return v.BooleanValue
+	default:
+		return nil
+	}
+}
+
 func ConvertToFields(recordData map[string]any) []*Field {
 	fields := make([]*Field, 0, len(recordData))
 	for k, v := range recordData {
@@ -52,4 +79,24 @@ func ConvertToFields(recordData map[string]any) []*Field {
 		})
 	}
 	return fields
+}
+
+func ConvertFromFields(fields []*Field) map[string]any {
+	recordData := make(map[string]any, len(fields))
+	for _, field := range fields {
+		recordData[field.GetName()] = ConvertFromValue(field.GetValue())
+	}
+	return recordData
+}
+
+func CreateFloat32Vector(vector []float32) *Vector {
+	return &Vector{
+		Data: &Vector_FloatData{FloatData: &FloatData{Value: vector}},
+	}
+}
+
+func CreateBoolVector(vector []bool) *Vector {
+	return &Vector{
+		Data: &Vector_BoolData{BoolData: &BoolData{Value: vector}},
+	}
 }

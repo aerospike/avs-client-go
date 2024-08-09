@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/aerospike/avs-client-go/protos"
 )
 
 type HostPort struct {
@@ -43,7 +45,7 @@ type UserPassCredentials struct {
 	password string
 }
 
-func NewCredntialsFromUserPass(username, password string) *UserPassCredentials {
+func NewCredentialsFromUserPass(username, password string) *UserPassCredentials {
 	return &UserPassCredentials{
 		username: username,
 		password: password,
@@ -51,3 +53,18 @@ func NewCredntialsFromUserPass(username, password string) *UserPassCredentials {
 }
 
 var ErrNotImplemented = errors.New("not implemented")
+
+type Record struct {
+	Data       map[string]any
+	Expiration uint32
+	Generation uint32
+}
+
+func newRecordFromProto(rec *protos.Record) *Record {
+	metadata := rec.GetAerospikeMetadata()
+	return &Record{
+		Data:       protos.ConvertFromFields(rec.Fields),
+		Expiration: metadata.Expiration,
+		Generation: metadata.Generation,
+	}
+}
