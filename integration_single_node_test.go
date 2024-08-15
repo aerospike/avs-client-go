@@ -36,12 +36,12 @@ func TestSingleNodeSuite(t *testing.T) {
 		logger.Error("Failed to read cert")
 	}
 
-	certificates, err := GetCertificates("docker/mtls/config/tls/localhost.crt", "docker/mtls/config/tls/localhost.key")
-	if err != nil {
-		t.Fatalf("unable to read certificates %v", err)
-		t.FailNow()
-		logger.Error("Failed to read cert")
-	}
+	// certificates, err := GetCertificates("docker/mtls/config/tls/localhost.crt", "docker/mtls/config/tls/localhost.key")
+	// if err != nil {
+	// 	t.Fatalf("unable to read certificates %v", err)
+	// 	t.FailNow()
+	// 	logger.Error("Failed to read cert")
+	// }
 
 	avsSeed := "127.0.0.1"
 	avsPort := 10000
