@@ -1,0 +1,42 @@
+name: Test
+on:
+  push:
+    branches:
+      - '**'  # Run on every branch
+#   pull_request:
+#     branches-ignore:
+#       - '**'  # Ignore all branches for pull requests
+  workflow_call:
+  
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get go version from go.mod
+      run: |
+        echo "GO_VERSION=$(grep '^go ' go.mod | cut -d " " -f 2)" >> $GITHUB_ENV
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    - name: Write feature keys
+      env:
+        FEATURES_CONF : ${{secrets.FEATURES_CONF}}
+
+      run: |
+        echo "$FEATURES_CONF" > docker/vanilla/config/features.conf
+        echo "$FEATURES_CONF" > docker/tls/config/features.conf
+        echo "$FEATURES_CONF" > docker/mtls/config/features.conf
+        echo "$FEATURES_CONF" > docker/auth/config/features.conf
+    - name: Login to Aerospike Jfrog
+      run: |
+        docker login aerospike.jfrog.io --username ${{ secrets.JFROG_USERNAME }} --password ${{ secrets.JFROG_ACCESS_TOKEN }}
+    - name: Run tests
+      run: |
+        make coverage
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+        files: ./coverage/total.cov
+        verbose: false
