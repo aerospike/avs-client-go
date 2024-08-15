@@ -5,6 +5,7 @@ package avs
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"os"
@@ -36,50 +37,50 @@ func TestSingleNodeSuite(t *testing.T) {
 		logger.Error("Failed to read cert")
 	}
 
-	// certificates, err := GetCertificates("docker/mtls/config/tls/localhost.crt", "docker/mtls/config/tls/localhost.key")
-	// if err != nil {
-	// 	t.Fatalf("unable to read certificates %v", err)
-	// 	t.FailNow()
-	// 	logger.Error("Failed to read cert")
-	// }
+	certificates, err := GetCertificates("docker/mtls/config/tls/localhost.crt", "docker/mtls/config/tls/localhost.key")
+	if err != nil {
+		t.Fatalf("unable to read certificates %v", err)
+		t.FailNow()
+		logger.Error("Failed to read cert")
+	}
 
-	avsSeed := "127.0.0.1"
+	avsSeed := "localhost"
 	avsPort := 10000
 	avsHostPort := NewHostPort(avsSeed, avsPort)
 
 	logger.Info("%v", slog.Any("cert", rootCA))
 	suites := []*SingleNodeTestSuite{
-		{
-			ServerTestBaseSuite: ServerTestBaseSuite{
-				ComposeFile: "docker/multi-node/docker-compose.yml", // vanilla
-				// SuiteFlags: []string{
-				// 	"--log-level debug",
-				// 	"--timeout 10s",
-				// 	CreateFlagStr(flags.Seeds, avsHostPort.String()),
-				// },
-				AvsLB:       false,
-				AvsHostPort: avsHostPort,
-			},
-		},
 		// {
 		// 	ServerTestBaseSuite: ServerTestBaseSuite{
-		// 		ComposeFile: "docker/mtls/docker-compose.yml", // mutual tls
+		// 		ComposeFile: "docker/multi-node/docker-compose.yml", // vanilla
 		// 		// SuiteFlags: []string{
 		// 		// 	"--log-level debug",
 		// 		// 	"--timeout 10s",
-		// 		// 	CreateFlagStr(flags.Host, avsHostPort.String()),
-		// 		// 	CreateFlagStr(flags.TLSCaFile, "docker/mtls/config/tls/ca.aerospike.com.crt"),
-		// 		// 	CreateFlagStr(flags.TLSCertFile, "docker/mtls/config/tls/localhost.crt"),
-		// 		// 	CreateFlagStr(flags.TLSKeyFile, "docker/mtls/config/tls/localhost.key"),
+		// 		// 	CreateFlagStr(flags.Seeds, avsHostPort.String()),
 		// 		// },
-		// 		AvsTLSConfig: &tls.Config{
-		// 			Certificates: certificates,
-		// 			RootCAs:      rootCA,
-		// 		},
+		// 		AvsLB:       false,
 		// 		AvsHostPort: avsHostPort,
-		// 		AvsLB:       true,
 		// 	},
 		// },
+		{
+			ServerTestBaseSuite: ServerTestBaseSuite{
+				ComposeFile: "docker/mtls/docker-compose.yml", // mutual tls
+				// SuiteFlags: []string{
+				// 	"--log-level debug",
+				// 	"--timeout 10s",
+				// 	CreateFlagStr(flags.Host, avsHostPort.String()),
+				// 	CreateFlagStr(flags.TLSCaFile, "docker/mtls/config/tls/ca.aerospike.com.crt"),
+				// 	CreateFlagStr(flags.TLSCertFile, "docker/mtls/config/tls/localhost.crt"),
+				// 	CreateFlagStr(flags.TLSKeyFile, "docker/mtls/config/tls/localhost.key"),
+				// },
+				AvsTLSConfig: &tls.Config{
+					Certificates: certificates,
+					RootCAs:      rootCA,
+				},
+				AvsHostPort: avsHostPort,
+				AvsLB:       true,
+			},
+		},
 		// {
 		// 	ServerTestBaseSuite: ServerTestBaseSuite{
 		// 		ComposeFile: "docker/auth/docker-compose.yml", // tls + auth (auth requires tls)
