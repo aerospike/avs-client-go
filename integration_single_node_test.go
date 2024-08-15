@@ -50,29 +50,16 @@ func TestSingleNodeSuite(t *testing.T) {
 
 	logger.Info("%v", slog.Any("cert", rootCA))
 	suites := []*SingleNodeTestSuite{
-		// {
-		// 	ServerTestBaseSuite: ServerTestBaseSuite{
-		// 		ComposeFile: "docker/multi-node/docker-compose.yml", // vanilla
-		// 		// SuiteFlags: []string{
-		// 		// 	"--log-level debug",
-		// 		// 	"--timeout 10s",
-		// 		// 	CreateFlagStr(flags.Seeds, avsHostPort.String()),
-		// 		// },
-		// 		AvsLB:       false,
-		// 		AvsHostPort: avsHostPort,
-		// 	},
-		// },
+		{
+			ServerTestBaseSuite: ServerTestBaseSuite{
+				ComposeFile: "docker/multi-node/docker-compose.yml", // vanilla
+				AvsLB:       false,
+				AvsHostPort: avsHostPort,
+			},
+		},
 		{
 			ServerTestBaseSuite: ServerTestBaseSuite{
 				ComposeFile: "docker/mtls/docker-compose.yml", // mutual tls
-				// SuiteFlags: []string{
-				// 	"--log-level debug",
-				// 	"--timeout 10s",
-				// 	CreateFlagStr(flags.Host, avsHostPort.String()),
-				// 	CreateFlagStr(flags.TLSCaFile, "docker/mtls/config/tls/ca.aerospike.com.crt"),
-				// 	CreateFlagStr(flags.TLSCertFile, "docker/mtls/config/tls/localhost.crt"),
-				// 	CreateFlagStr(flags.TLSKeyFile, "docker/mtls/config/tls/localhost.key"),
-				// },
 				AvsTLSConfig: &tls.Config{
 					Certificates: certificates,
 					RootCAs:      rootCA,
@@ -81,26 +68,18 @@ func TestSingleNodeSuite(t *testing.T) {
 				AvsLB:       true,
 			},
 		},
-		// {
-		// 	ServerTestBaseSuite: ServerTestBaseSuite{
-		// 		ComposeFile: "docker/auth/docker-compose.yml", // tls + auth (auth requires tls)
-		// 		// SuiteFlags: []string{
-		// 		// 	"--log-level debug",
-		// 		// 	"--timeout 10s",
-		// 		// 	CreateFlagStr(flags.Host, avsHostPort.String()),
-		// 		// 	CreateFlagStr(flags.TLSCaFile, "docker/auth/config/tls/ca.aerospike.com.crt"),
-		// 		// 	CreateFlagStr(flags.AuthUser, "admin"),
-		// 		// 	CreateFlagStr(flags.AuthPassword, "admin"),
-		// 		// },
-		// 		AvsCreds: NewCredentialsFromUserPass("admin", "admin"),
-		// 		AvsTLSConfig: &tls.Config{
-		// 			Certificates: nil,
-		// 			RootCAs:      rootCA,
-		// 		},
-		// 		AvsHostPort: avsHostPort,
-		// 		AvsLB:       true,
-		// 	},
-		// },
+		{
+			ServerTestBaseSuite: ServerTestBaseSuite{
+				ComposeFile: "docker/auth/docker-compose.yml", // tls + auth (auth requires tls)
+				AvsCreds:    NewCredentialsFromUserPass("admin", "admin"),
+				AvsTLSConfig: &tls.Config{
+					Certificates: nil,
+					RootCAs:      rootCA,
+				},
+				AvsHostPort: avsHostPort,
+				AvsLB:       true,
+			},
+		},
 	}
 
 	for _, s := range suites {
