@@ -4,7 +4,6 @@ package avs
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"log/slog"
 	"strconv"
@@ -84,22 +83,38 @@ func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace 
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to insert record", slog.Any("error", err))
-		return err
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return NewAVSError(msg, err)
+	}
+
+	protoKey, err := protos.ConvertToKey(namespace, set, key)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return NewAVSError(msg, err)
+	}
+
+	fields, err := protos.ConvertToFields(recordData)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return NewAVSError(msg, err)
 	}
 
 	putReq := &protos.PutRequest{
-		Key: &protos.Key{
-			Namespace: namespace,
-			Set:       set,
-			Value:     protos.ConvertToKey(key),
-		},
+		Key:                protoKey,
 		WriteType:          writeType,
-		Fields:             protos.ConvertToFields(recordData),
+		Fields:             fields,
 		IgnoreMemQueueFull: ignoreMemQueueFull,
 	}
 
 	_, err = conn.transactClient.Put(ctx, putReq)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+		return NewAVSErrorFromGrpc(msg, err)
+	}
 
 	return err
 }
@@ -115,7 +130,7 @@ func (c *Client) Update(ctx context.Context, namespace string, set *string, key 
 }
 
 func (c *Client) Upsert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
-	c.logger.InfoContext(ctx, "upserting record", slog.String("namespace", namespace), slog.Any("key", key))
+	c.logger.InfoContext(ctx, "upserting record", slog.String("namespace", namespace), slog.Any("set", set), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_UPSERT, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
@@ -135,22 +150,33 @@ func (c *Client) Get(ctx context.Context,
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to get record", slog.Any("error", err))
-		return nil, err
+		msg := "failed to get record"
+		logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSError(msg, err)
+	}
+
+	protoKey, err := protos.ConvertToKey(namespace, set, key)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSError(msg, err)
 	}
 
 	getReq := &protos.GetRequest{
-		Key: &protos.Key{
-			Namespace: namespace,
-			Set:       set,
-			Value:     protos.ConvertToKey(key),
-		},
+		Key:        protoKey,
 		Projection: createProjectionSpec(includeFields, excludeFields),
 	}
 
 	record, err := conn.transactClient.Get(ctx, getReq)
-	// TODO handle err
-	return newRecordFromProto(record), err
+	if err != nil {
+		msg := "failed to get record"
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+		return nil, NewAVSErrorFromGrpc(msg, err)
+	}
+
+	logger.Debug("received record", slog.Any("record", record.Fields))
+
+	return newRecordFromProto(record), nil
 }
 
 //nolint:revive // TODO
@@ -167,12 +193,15 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 		return err
 	}
 
+	protoKey, err := protos.ConvertToKey(namespace, set, key)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return NewAVSError(msg, err)
+	}
+
 	getReq := &protos.DeleteRequest{
-		Key: &protos.Key{
-			Namespace: namespace,
-			Set:       set,
-			Value:     protos.ConvertToKey(key),
-		},
+		Key: protoKey,
 	}
 
 	_, err = conn.transactClient.Delete(ctx, getReq)
@@ -199,12 +228,15 @@ func (c *Client) Exists(
 		return false, err
 	}
 
+	protoKey, err := protos.ConvertToKey(namespace, set, key)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return false, NewAVSError(msg, err)
+	}
+
 	existsReq := &protos.ExistsRequest{
-		Key: &protos.Key{
-			Namespace: namespace,
-			Set:       set,
-			Value:     protos.ConvertToKey(key),
-		},
+		Key: protoKey,
 	}
 
 	boolean, err := conn.transactClient.Exists(ctx, existsReq)
@@ -227,12 +259,15 @@ func (c *Client) IsIndexed(ctx context.Context, namespace string, set *string, i
 		return false, err
 	}
 
+	protoKey, err := protos.ConvertToKey(namespace, set, key)
+	if err != nil {
+		msg := "failed to insert record"
+		logger.Error(msg, slog.Any("error", err))
+		return false, NewAVSError(msg, err)
+	}
+
 	isIndexedReq := &protos.IsIndexedRequest{
-		Key: &protos.Key{
-			Namespace: namespace,
-			Set:       set,
-			Value:     protos.ConvertToKey(key),
-		},
+		Key: protoKey,
 	}
 
 	boolean, err := conn.transactClient.IsIndexed(ctx, isIndexedReq)
@@ -249,9 +284,11 @@ func (c *Client) vectorSearch(ctx context.Context,
 	vector *protos.Vector,
 	limit uint32,
 	searchParams *protos.HnswSearchParams,
-	projections *protos.ProjectionSpec,
-) ([]*protos.Neighbor, error) {
+	includeFields []string,
+	excludeFields []string,
+) ([]*Neighbor, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
+	logger.InfoContext(ctx, "searching for vector")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -259,26 +296,43 @@ func (c *Client) vectorSearch(ctx context.Context,
 		return nil, err
 	}
 
-	vectorSearchReq := createVectorSearchRequest(namespace, indexName, vector, limit, searchParams, projections)
+	vectorSearchReq := createVectorSearchRequest(
+		namespace,
+		indexName,
+		vector,
+		limit,
+		searchParams,
+		createProjectionSpec(includeFields, excludeFields),
+	)
 
 	resp, err := conn.transactClient.VectorSearch(ctx, vectorSearchReq)
 	if err != nil {
-		logger.Error("failed to search for vector", slog.Any("error", err))
-		return nil, err
+		msg := "failed to search for vector"
+		logger.Error(msg, slog.Any("error", err))
+		return nil, NewAVSError(msg, err)
 	}
 
-	neighbors := make([]*protos.Neighbor, 0, limit)
+	neighbors := make([]*Neighbor, 0, limit)
 
 	for {
-		n, err := resp.Recv()
+		protoNeigh, err := resp.Recv()
 
 		if err != nil {
 			if err != io.EOF {
-				logger.Error("failed to receive all neighbors", slog.Any("error", err))
-				return neighbors, fmt.Errorf("failed to receive all neighbors: %w", err)
+				msg := "failed to receive all neighbors"
+				logger.Error(msg, slog.Any("error", err))
+				return neighbors, NewAVSError(msg, err)
 			}
 
+			logger.DebugContext(ctx, "received all neighbors", slog.Any("neighbors", neighbors))
 			return neighbors, nil
+		}
+
+		n, err := newNeighborFromProto(protoNeigh)
+		if err != nil {
+			msg := "failed to convert neighbor"
+			logger.Error(msg, slog.Any("error", err))
+			return neighbors, NewAVSError(msg, err)
 		}
 
 		neighbors = append(neighbors, n)
@@ -294,18 +348,29 @@ func (c *Client) vectorSearch(ctx context.Context,
 //   - searchParams: Extra options sent to the server to configure behavior of the
 //     HNSW algorithm.
 //   - projections: Extra options to configure the behavior of the which keys
-func (c *Client) VectorSearchFloat32(ctx context.Context,
+func (c *Client) VectorSearchFloat32(
+	ctx context.Context,
 	namespace,
 	indexName string,
 	query []float32,
 	limit uint32,
 	searchParams *protos.HnswSearchParams,
-	projections *protos.ProjectionSpec,
-) ([]*protos.Neighbor, error) {
+	includeFields,
+	excludeFields []string,
+) ([]*Neighbor, error) {
 	c.logger.InfoContext(ctx, "searching for float vector")
 
 	vector := protos.CreateFloat32Vector(query)
-	return c.vectorSearch(ctx, namespace, indexName, vector, limit, searchParams, projections)
+	return c.vectorSearch(
+		ctx,
+		namespace,
+		indexName,
+		vector,
+		limit,
+		searchParams,
+		includeFields,
+		excludeFields,
+	)
 }
 
 // VectorSearchBool searches for the nearest neighbors of the query vector in the
@@ -323,17 +388,79 @@ func (c *Client) VectorSearchBool(ctx context.Context,
 	query []bool,
 	limit uint32,
 	searchParams *protos.HnswSearchParams,
-	projections *protos.ProjectionSpec,
-) ([]*protos.Neighbor, error) {
+	includeFields,
+	excludeFields []string,
+) ([]*Neighbor, error) {
 	c.logger.InfoContext(ctx, "searching for bool vector")
 
 	vector := protos.CreateBoolVector(query)
-	return c.vectorSearch(ctx, namespace, indexName, vector, limit, searchParams, projections)
+	return c.vectorSearch(
+		ctx,
+		namespace,
+		indexName,
+		vector,
+		limit,
+		searchParams,
+		includeFields,
+		excludeFields,
+	)
 }
 
 //nolint:revive // TODO
-func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexName string, timeout int) error {
-	return ErrNotImplemented
+func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexName string, waitInterval time.Duration) error {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
+	logger.InfoContext(ctx, "waiting for index completion")
+
+	conn, err := c.channelProvider.GetRandomConn()
+	if err != nil {
+		logger.Error("failed to wait for index completion", slog.Any("error", err))
+		return err
+	}
+
+	indexID := &protos.IndexId{
+		Namespace: namespace,
+		Name:      indexName,
+	}
+
+	timer := time.NewTimer(waitInterval)
+	startTime := time.Now()
+	unmergedZeroCount := 0
+	unmergedNotZeroCount := 0
+
+	defer timer.Stop()
+
+	for {
+		status, err := conn.indexClient.GetStatus(ctx, indexID)
+		if err != nil {
+			logger.ErrorContext(ctx, "failed to wait for index completion", slog.Any("error", err))
+			return err
+		}
+
+		// We consider the index completed when unmerged record count == 0 for
+		// 2 cycles OR unmerged record count != 0 and now it == 0.
+		unmerged := status.GetUnmergedRecordCount()
+		if unmerged == 0 {
+			if unmergedZeroCount >= 2 || unmergedNotZeroCount >= 1 {
+				logger.InfoContext(ctx, "index completed", slog.Duration("duration", time.Since(startTime)))
+				return nil
+			}
+
+			unmergedZeroCount += 1
+			logger.DebugContext(ctx, "index not yet completed", slog.Int64("unmerged", unmerged))
+		} else {
+			logger.DebugContext(ctx, "index not yet completed", slog.Int64("unmerged", unmerged))
+			unmergedNotZeroCount += 1
+		}
+
+		timer.Reset(waitInterval)
+
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			logger.ErrorContext(ctx, "waiting for index completion canceled")
+			return ctx.Err()
+		}
+	}
 }
 
 // IndexCreateOpts are optional fields to further configure the behavior of your index.
@@ -429,7 +556,7 @@ func (c *Client) IndexCreateFromIndexDef(
 		msg := "failed to create index from definition"
 		logger.Error(msg, slog.Any("error", err))
 
-		return NewAVSErrorFromGrpc(msg, err)
+		return NewAVSError(msg, err)
 	}
 
 	_, err = conn.indexClient.Create(ctx, indexDef)
@@ -902,7 +1029,7 @@ func (c *Client) ConnectedNodeEndpoint(
 		msg := "failed to get connected endpoint"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
-		return nil, NewAVSError(msg)
+		return nil, NewAVSError(msg, err)
 	}
 
 	splitEndpoint := strings.Split(conn.grpcConn.Target(), ":")
@@ -917,7 +1044,7 @@ func (c *Client) ConnectedNodeEndpoint(
 			msg := "failed to parse port"
 			c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
-			return nil, NewAVSErrorFromGrpc(msg, err)
+			return nil, NewAVSError(msg, err)
 		}
 
 		resp.Port = uint32(port)
@@ -946,7 +1073,7 @@ func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*p
 		msg := "failed to list roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
-		return nil, NewAVSErrorFromGrpc(msg, err)
+		return nil, NewAVSError(msg, err)
 	}
 
 	state, err := conn.clusterInfoClient.GetClusteringState(ctx, &emptypb.Empty{})
@@ -985,7 +1112,7 @@ func (c *Client) ClusterEndpoints(
 		msg := "failed to get cluster endpoints"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
-		return nil, NewAVSErrorFromGrpc(msg, err)
+		return nil, NewAVSError(msg, err)
 	}
 
 	endpoints, err := conn.clusterInfoClient.GetClusterEndpoints(ctx,

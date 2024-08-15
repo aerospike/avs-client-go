@@ -41,7 +41,14 @@ func createVectorSearchRequest(
 }
 
 func createProjectionSpec(includeFields, excludeFields []string) *protos.ProjectionSpec {
-	spec := &protos.ProjectionSpec{}
+	spec := &protos.ProjectionSpec{
+		Include: &protos.ProjectionFilter{
+			Type: protos.ProjectionType_ALL,
+		},
+		Exclude: &protos.ProjectionFilter{
+			Type: protos.ProjectionType_NONE,
+		},
+	}
 
 	if includeFields != nil {
 		spec.Include = &protos.ProjectionFilter{

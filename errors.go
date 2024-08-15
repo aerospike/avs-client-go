@@ -10,7 +10,11 @@ type Error struct {
 	msg string
 }
 
-func NewAVSError(msg string) error {
+func NewAVSError(msg string, err error) error {
+	if err != nil {
+		msg = fmt.Sprintf("%s: %s", msg, err.Error())
+	}
+
 	return &Error{msg: msg}
 }
 
@@ -21,7 +25,7 @@ func NewAVSErrorFromGrpc(msg string, gErr error) error {
 
 	gStatus, ok := status.FromError(gErr)
 	if !ok {
-		return NewAVSError(gErr.Error())
+		return NewAVSError(gErr.Error(), nil)
 	}
 
 	errStr := fmt.Sprintf("%s: server error: %s", msg, gStatus.Code().String())
@@ -36,7 +40,7 @@ func NewAVSErrorFromGrpc(msg string, gErr error) error {
 		errStr = fmt.Sprintf("%s, details=%v", errStr, details)
 	}
 
-	return NewAVSError(errStr)
+	return NewAVSError(errStr, nil)
 }
 
 func (e *Error) Error() string {

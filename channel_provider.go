@@ -393,7 +393,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 			msg = fmt.Sprintf("%s: %s", msg, err)
 		}
 
-		return NewAVSError(msg)
+		return NewAVSError(msg, nil)
 	}
 
 	return nil
@@ -471,17 +471,19 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 
 			clusterID, err := client.GetClusterId(ctx, &emptypb.Empty{})
 			if err != nil {
-				logger.Warn("failed to get cluster ID", slog.Any("error", err))
+				logger.WarnContext(ctx, "failed to get cluster ID", slog.Any("error", err))
 			}
 
 			if !cp.checkAndSetClusterID(clusterID.GetId()) {
-				logger.Debug("old cluster ID found, skipping channel discovery")
+				logger.DebugContext(ctx, "old cluster ID found, skipping channel discovery", slog.Uint64("clusterID", clusterID.GetId()))
 				return
 			}
 
+			logger.DebugContext(ctx, "new cluster ID found", slog.Uint64("clusterID", clusterID.GetId()))
+
 			endpointsResp, err := client.GetClusterEndpoints(ctx, endpointsReq)
 			if err != nil {
-				logger.Error("failed to get cluster endpoints", slog.Any("error", err))
+				logger.ErrorContext(ctx, "failed to get cluster endpoints", slog.Any("error", err))
 				return
 			}
 
@@ -499,10 +501,9 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 	for endpoints := range endpointsChan {
 		if maxTempEndpoints == nil || len(endpoints) > len(maxTempEndpoints) {
 			maxTempEndpoints = endpoints
+			cp.logger.DebugContext(ctx, "found new cluster ID", slog.Any("endpoints", maxTempEndpoints))
 		}
 	}
-
-	cp.logger.Debug("found new cluster ID", slog.Any("endpoints", maxTempEndpoints))
 
 	return maxTempEndpoints
 }

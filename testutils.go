@@ -25,6 +25,7 @@ type ServerTestBaseSuite struct {
 	ComposeFile  string
 	CoverFile    string
 	AvsHostPort  *HostPort
+	AvsLB        bool
 	AvsTLSConfig *tls.Config
 	AvsCreds     *UserPassCredentials
 	AvsClient    *Client
@@ -35,7 +36,11 @@ var wd, _ = os.Getwd()
 
 func (suite *ServerTestBaseSuite) SetupSuite() {
 	suite.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	suite.Logger = suite.Logger.With("test", suite.Name)
+
+	if suite.Name != "" {
+		suite.Logger = suite.Logger.With("suite", suite.Name)
+	}
+
 	suite.CoverFile = path.Join(wd, "../coverage/client-coverage.cov")
 
 	err := DockerComposeUp(suite.ComposeFile)
@@ -48,7 +53,7 @@ func (suite *ServerTestBaseSuite) SetupSuite() {
 
 	suite.Assert().NoError(err)
 
-	suite.AvsClient, err = GetClient(suite.AvsHostPort, suite.AvsCreds, suite.AvsTLSConfig, suite.Logger)
+	suite.AvsClient, err = GetClient(suite.AvsHostPort, suite.AvsLB, suite.AvsCreds, suite.AvsTLSConfig, suite.Logger)
 	if err != nil {
 		suite.FailNowf("unable to create admin client", "%v", err)
 	}
@@ -358,6 +363,7 @@ func DockerComposeDown(composeFile string) error {
 
 func GetClient(
 	avsHostPort *HostPort,
+	avsLB bool,
 	avsCreds *UserPassCredentials,
 	avsTLSConfig *tls.Config,
 	logger *slog.Logger,
@@ -376,7 +382,7 @@ func GetClient(
 			ctx,
 			HostPortSlice{avsHostPort},
 			nil,
-			true,
+			avsLB,
 			avsCreds,
 			avsTLSConfig,
 			logger,
