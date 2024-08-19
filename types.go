@@ -58,7 +58,7 @@ var AerospikeEpoch = time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type Record struct {
 	Data       map[string]any
-	Expiration time.Time
+	Expiration *time.Time
 	Generation uint32
 }
 
@@ -77,7 +77,10 @@ func newRecordFromProto(rec *protos.Record) *Record {
 	}
 
 	if metadata != nil {
-		record.Expiration = AerospikeEpoch.Add(time.Second * time.Duration(metadata.GetExpiration()))
+		if metadata.Expiration != 0 {
+			exp := AerospikeEpoch.Add(time.Second * time.Duration(metadata.GetExpiration()))
+			record.Expiration = &exp
+		}
 		record.Generation = metadata.GetGeneration()
 	}
 
