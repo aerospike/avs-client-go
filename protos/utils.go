@@ -1,6 +1,9 @@
 package protos
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 func ConvertToKey(namespace string, set *string, key any) (*Key, error) {
 	k := &Key{
@@ -70,25 +73,43 @@ func ConvertToValue(value any) (*Value, error) {
 		convertedValue = &Value{Value: &Value_VectorValue{VectorValue: v}}
 	case bool:
 		convertedValue = &Value{Value: &Value_BooleanValue{BooleanValue: v}}
-	case map[any]any:
-		m, err := ConvertToMapValue(v)
-		if err != nil {
-			return nil, err
-		}
+	// case map[any]any:
+	// 	m, err := ConvertToMapValue(v)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		return ConvertToValue(m)
-	case []any:
-		l, err := ConvertToList(v)
-		if err != nil {
-			return nil, err
-		}
+	// 	return ConvertToValue(m)
+	// case []any:
+	// 	l, err := ConvertToList(v)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		return ConvertToValue(l)
+	// 	return ConvertToValue(l)
 	case []float32:
 		return ConvertToValue(CreateFloat32Vector(v))
 	case []bool:
 		return ConvertToValue(CreateBoolVector(v))
 	default:
+		val := reflect.ValueOf(value)
+		switch val.Kind() {
+		case reflect.Map:
+			m, err := ConvertToMapValue(val.Interface())
+			if err != nil {
+				return nil, err
+			}
+
+			return ConvertToValue(m)
+		case reflect.Slice:
+			l, err := ConvertToList(val.Interface())
+			if err != nil {
+				return nil, err
+			}
+
+			return ConvertToValue(l)
+		}
+
 		return nil, fmt.Errorf("unsupported value type: %T", value)
 	}
 
@@ -107,6 +128,8 @@ func ConvertToMapKey(key any) (*MapKey, error) {
 		keyValue = &MapKey{Value: &MapKey_IntValue{IntValue: v}}
 	case int64:
 		keyValue = &MapKey{Value: &MapKey_LongValue{LongValue: v}}
+	case int:
+		keyValue = &MapKey{Value: &MapKey_LongValue{LongValue: int64(v)}}
 	default:
 		return nil, fmt.Errorf("unsupported key type: %T", key)
 	}
@@ -128,23 +151,23 @@ func ConvertFromMapKey(key *MapKey) (any, error) {
 	}
 }
 
-func ConvertToMapValue(value map[any]any) (*Map, error) {
-	entries := make([]*MapEntry, 0, len(value))
-
-	for key, value := range value {
-		k, err := ConvertToMapKey(key)
+func ConvertToMapValue(value any) (*Map, error) {
+	val := reflect.ValueOf(value)
+	entries := make([]*MapEntry, 0, val.Len())
+	for _, e := range val.MapKeys() {
+		key, err := ConvertToMapKey(e.Interface())
 		if err != nil {
 			return nil, fmt.Errorf("unsupported map key: %w", err)
 		}
 
-		v, err := ConvertToValue(value)
+		val, err := ConvertToValue(val.MapIndex(e).Interface())
 		if err != nil {
 			return nil, fmt.Errorf("unsupported map value: %w", err)
 		}
 
 		entries = append(entries, &MapEntry{
-			Key:   k,
-			Value: v,
+			Key:   key,
+			Value: val,
 		})
 	}
 
@@ -173,15 +196,21 @@ func ConvertFromMapValue(value *Map) (map[any]any, error) {
 	return entries, nil
 }
 
-func ConvertToList(value []any) (*List, error) {
-	entries := make([]*Value, len(value))
+func ConvertToList(value any) (*List, error) {
+	refValue := reflect.ValueOf(value)
 
-	for idx, val := range value {
-		v, err := ConvertToValue(val)
+	if refValue.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("unsupported list value: %T", value)
+	}
+
+	entries := make([]*Value, 0, refValue.Len())
+	for i := 0; i < refValue.Len(); i++ {
+		v, err := ConvertToValue(refValue.Index(i).Interface())
 		if err != nil {
 			return nil, fmt.Errorf("unsupported list value: %w", err)
 		}
-		entries[idx] = v
+
+		entries = append(entries, v)
 	}
 
 	return &List{

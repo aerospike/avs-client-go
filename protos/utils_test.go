@@ -252,6 +252,52 @@ func TestConvertToValue(t *testing.T) {
 			},
 		},
 		{
+			input: map[string]string{"key": "value"},
+			expected: &Value{
+				Value: &Value_MapValue{
+					MapValue: &Map{
+						Entries: []*MapEntry{
+							{
+								Key: &MapKey{
+									Value: &MapKey_StringValue{
+										StringValue: "key",
+									},
+								},
+								Value: &Value{
+									Value: &Value_StringValue{
+										StringValue: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input: map[int]float64{10: 3.124},
+			expected: &Value{
+				Value: &Value_MapValue{
+					MapValue: &Map{
+						Entries: []*MapEntry{
+							{
+								Key: &MapKey{
+									Value: &MapKey_LongValue{
+										LongValue: int64(10),
+									},
+								},
+								Value: &Value{
+									Value: &Value_DoubleValue{
+										DoubleValue: 3.124,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			input: []any{"item1", "item2"},
 			expected: &Value{
 				Value: &Value_ListValue{
@@ -265,6 +311,48 @@ func TestConvertToValue(t *testing.T) {
 							{
 								Value: &Value_StringValue{
 									StringValue: "item2",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input: []string{"item1", "item2"},
+			expected: &Value{
+				Value: &Value_ListValue{
+					ListValue: &List{
+						Entries: []*Value{
+							{
+								Value: &Value_StringValue{
+									StringValue: "item1",
+								},
+							},
+							{
+								Value: &Value_StringValue{
+									StringValue: "item2",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input: []int{1, 2},
+			expected: &Value{
+				Value: &Value_ListValue{
+					ListValue: &List{
+						Entries: []*Value{
+							{
+								Value: &Value_LongValue{
+									LongValue: int64(1),
+								},
+							},
+							{
+								Value: &Value_LongValue{
+									LongValue: int64(2),
 								},
 							},
 						},
