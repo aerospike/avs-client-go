@@ -24,6 +24,13 @@ var (
 	barNamespace  = "bar"
 )
 
+var keyStart = 100000
+
+func getUniqueKey() string {
+	keyStart++
+	return fmt.Sprintf("key%d", keyStart)
+}
+
 type SingleNodeTestSuite struct {
 	ServerTestBaseSuite
 }
@@ -148,6 +155,44 @@ func (suite *SingleNodeTestSuite) TestBasicUpsertGetDelete() {
 		_, err = suite.AvsClient.Get(context.TODO(), rec.namespace, rec.set, rec.key, nil, nil)
 		suite.Error(err)
 	}
+}
+
+func (suite *SingleNodeTestSuite) TestFailsToInsertAlreadyExists() {
+	ctx := context.Background()
+	key := getUniqueKey()
+
+	err := suite.AvsClient.Insert(ctx, "test", nil, key, map[string]any{"foo": "bar"}, false)
+	suite.NoError(err)
+
+	if err != nil {
+		return
+	}
+
+	err = suite.AvsClient.Insert(ctx, "test", nil, key, map[string]any{"foo": "bar"}, false)
+	suite.Error(err)
+}
+
+func (suite *SingleNodeTestSuite) TestFailsToUpdateRecordDNE() {
+	ctx := context.Background()
+	key := getUniqueKey()
+
+	err := suite.AvsClient.Update(ctx, "test", nil, key, map[string]any{"foo": "bar"}, false)
+	suite.Error(err)
+}
+
+func (suite *SingleNodeTestSuite) TestCanUpsertRecordTwice() {
+	ctx := context.Background()
+	key := getUniqueKey()
+
+	err := suite.AvsClient.Upsert(ctx, "test", nil, key, map[string]any{"foo": "bar"}, false)
+	suite.NoError(err)
+
+	if err != nil {
+		return
+	}
+
+	err = suite.AvsClient.Upsert(ctx, "test", nil, key, map[string]any{"foo": "bar"}, false)
+	suite.NoError(err)
 }
 
 func getVectorFloat32(length int, last float32) []float32 {
