@@ -499,7 +499,7 @@ func (c *Client) vectorSearch(ctx context.Context,
 //	limit (uint32): The maximum number of neighbors to return.
 //	searchParams (*protos.HnswSearchParams): Extra options to configure the behavior of the HNSW algorithm.
 //	includeFields ([]string): Fields to include in the response. Default is all.
-//	includeFields ([]string): Fields to include in the excludeFields ([]string): Fields to exclude from the response. Default is none.. Default is all.
+//	excludeFields ([]string): Fields to exclude from the response. Default is none.
 //
 // Returns:
 //
@@ -543,7 +543,7 @@ func (c *Client) VectorSearchFloat32(
 //	limit (uint32): The maximum number of neighbors to return.
 //	searchParams (*protos.HnswSearchParams): Extra options to configure the behavior of the HNSW algorithm.
 //	includeFields ([]string): Fields to include in the response. Default is all.
-//	includeFields ([]string): Fields to include in the excludeFields ([]string): Fields to exclude from the response. Default is none.. Default is all.
+//	excludeFields ([]string): Fields to exclude from the response. Default is none.
 //
 // Returns:
 //

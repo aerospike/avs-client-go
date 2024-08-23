@@ -60,7 +60,7 @@ func TestConvertToKey(t *testing.T) {
 		{
 			input:       &keyUnknown{},
 			expected:    nil, // Unsupported type
-			expectedErr: fmt.Errorf("unsupported key type: *protos.key_Unknown"),
+			expectedErr: fmt.Errorf("unsupported key type: *protos.keyUnknown"),
 		},
 	}
 
@@ -141,7 +141,7 @@ func TestConvertFromKey(t *testing.T) {
 			expectedNamespace: "testNamespace",
 			expectedSet:       GetStrPtr("testSet"),
 			expectedKey:       nil, // Unsupported or nil input
-			expectedErr:       fmt.Errorf("unsupported key value type: *protos.key_Unknown"),
+			expectedErr:       fmt.Errorf("unsupported key value type: *protos.keyUnknown"),
 		},
 	}
 
@@ -491,7 +491,7 @@ func TestConvertFromValue(t *testing.T) {
 				Value: &valueUnknown{},
 			},
 			expected:    nil,
-			expectedErr: fmt.Errorf("unsupported value type: *protos.value_Unknown"),
+			expectedErr: fmt.Errorf("unsupported value type: *protos.valueUnknown"),
 		},
 	}
 
