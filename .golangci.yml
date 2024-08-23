@@ -23,6 +23,7 @@ linters-settings:
         allow:
           - $gostd
           - github.com/aerospike/avs-client-go/protos
+          - 'github.com/stretchr/testify/assert'
 
 linters:
   disable-all: true
@@ -69,8 +70,11 @@ run:
 #  skip-files:
 #    - sample
 
-# issues:
-#   exclude-rules:
+issues:
+  exclude-rules:
+    - path: '(.+)test\.go'
+      linters:
+      - govet # Test code field alignment for sake of space is not a concern
 #     - path: dir/sample\.go
 #       linters:
 #       - lll # Test code is allowed to have long lines
@@ -80,9 +84,6 @@ run:
 #     - path: dir/sample\.go
 #       linters:
 #       - dupl # Test code is allowed to have duplicate code
-#     - path: '(.+)test\.go'
-#       linters:
-#       - govet # Test code field alignment for sake of space is not a concern
 #     - linters:
 #         - lll
 #       source: "// "

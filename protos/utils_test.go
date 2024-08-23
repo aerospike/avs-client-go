@@ -58,7 +58,7 @@ func TestConvertToKey(t *testing.T) {
 			},
 		},
 		{
-			input:       &key_Unknown{},
+			input:       &keyUnknown{},
 			expected:    nil, // Unsupported type
 			expectedErr: fmt.Errorf("unsupported key type: *protos.key_Unknown"),
 		},
@@ -72,9 +72,9 @@ func TestConvertToKey(t *testing.T) {
 	}
 }
 
-type key_Unknown struct{}
+type keyUnknown struct{}
 
-func (*key_Unknown) isKey_Value() {}
+func (*keyUnknown) isKey_Value() {} //nolint:revive,stylecheck // Grpc generated
 
 func TestConvertFromKey(t *testing.T) {
 	testCases := []struct {
@@ -136,7 +136,7 @@ func TestConvertFromKey(t *testing.T) {
 			input: &Key{
 				Namespace: "testNamespace",
 				Set:       GetStrPtr("testSet"),
-				Value:     &key_Unknown{},
+				Value:     &keyUnknown{},
 			},
 			expectedNamespace: "testNamespace",
 			expectedSet:       GetStrPtr("testSet"),
@@ -155,7 +155,6 @@ func TestConvertFromKey(t *testing.T) {
 			assert.Equal(t, tc.expectedErr, err)
 		})
 	}
-
 }
 
 func TestConvertToValue(t *testing.T) {
@@ -377,9 +376,9 @@ func TestConvertToValue(t *testing.T) {
 	}
 }
 
-type value_Unknown struct{}
+type valueUnknown struct{}
 
-func (*value_Unknown) isValue_Value() {}
+func (*valueUnknown) isValue_Value() {} //nolint:revive,stylecheck // Grpc generated
 
 func TestConvertFromValue(t *testing.T) {
 	testCases := []struct {
@@ -489,7 +488,7 @@ func TestConvertFromValue(t *testing.T) {
 		},
 		{
 			input: &Value{
-				Value: &value_Unknown{},
+				Value: &valueUnknown{},
 			},
 			expected:    nil,
 			expectedErr: fmt.Errorf("unsupported value type: *protos.value_Unknown"),

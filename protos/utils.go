@@ -73,27 +73,13 @@ func ConvertToValue(value any) (*Value, error) {
 		convertedValue = &Value{Value: &Value_VectorValue{VectorValue: v}}
 	case bool:
 		convertedValue = &Value{Value: &Value_BooleanValue{BooleanValue: v}}
-	// case map[any]any:
-	// 	m, err := ConvertToMapValue(v)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	return ConvertToValue(m)
-	// case []any:
-	// 	l, err := ConvertToList(v)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	return ConvertToValue(l)
 	case []float32:
 		return ConvertToValue(CreateFloat32Vector(v))
 	case []bool:
 		return ConvertToValue(CreateBoolVector(v))
 	default:
 		val := reflect.ValueOf(value)
-		switch val.Kind() {
+		switch val.Kind() { //nolint:exhaustive // default handles it
 		case reflect.Map:
 			m, err := ConvertToMapValue(val.Interface())
 			if err != nil {
@@ -108,9 +94,9 @@ func ConvertToValue(value any) (*Value, error) {
 			}
 
 			return ConvertToValue(l)
+		default:
+			return nil, fmt.Errorf("unsupported value type: %T", value)
 		}
-
-		return nil, fmt.Errorf("unsupported value type: %T", value)
 	}
 
 	return convertedValue, nil
@@ -133,6 +119,7 @@ func ConvertToMapKey(key any) (*MapKey, error) {
 	default:
 		return nil, fmt.Errorf("unsupported key type: %T", key)
 	}
+
 	return keyValue, nil
 }
 
@@ -154,6 +141,7 @@ func ConvertFromMapKey(key *MapKey) (any, error) {
 func ConvertToMapValue(value any) (*Map, error) {
 	val := reflect.ValueOf(value)
 	entries := make([]*MapEntry, 0, val.Len())
+
 	for _, e := range val.MapKeys() {
 		key, err := ConvertToMapKey(e.Interface())
 		if err != nil {
@@ -204,6 +192,7 @@ func ConvertToList(value any) (*List, error) {
 	}
 
 	entries := make([]*Value, 0, refValue.Len())
+
 	for i := 0; i < refValue.Len(); i++ {
 		v, err := ConvertToValue(refValue.Index(i).Interface())
 		if err != nil {
@@ -226,6 +215,7 @@ func ConvertFromListValue(value *List) ([]any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("unsupported list value: %w", err)
 		}
+
 		entries[idx] = val
 	}
 
@@ -279,13 +269,16 @@ func ConvertToFields(recordData map[string]any) ([]*Field, error) {
 
 func ConvertFromFields(fields []*Field) (map[string]any, error) {
 	recordData := make(map[string]any, len(fields))
+
 	for _, field := range fields {
 		convertedValue, err := ConvertFromValue(field.GetValue())
 		if err != nil {
 			return nil, fmt.Errorf("error converting field value for name '%s': %w", field.GetName(), err)
 		}
+
 		recordData[field.GetName()] = convertedValue
 	}
+
 	return recordData, nil
 }
 

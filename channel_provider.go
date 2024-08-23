@@ -475,7 +475,12 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 			}
 
 			if !cp.checkAndSetClusterID(clusterID.GetId()) {
-				logger.DebugContext(ctx, "old cluster ID found, skipping channel discovery", slog.Uint64("clusterID", clusterID.GetId()))
+				logger.DebugContext(
+					ctx,
+					"old cluster ID found, skipping channel discovery",
+					slog.Uint64("clusterID", clusterID.GetId()),
+				)
+
 				return
 			}
 

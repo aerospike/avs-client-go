@@ -19,6 +19,7 @@ import (
 const (
 	indexTimeoutDuration = time.Second * 100
 	indexWaitDuration    = time.Millisecond * 100
+	failedToInsertRecord = "failed to insert record"
 )
 
 // Client is a client for managing Aerospike Vector Indexes.
@@ -27,16 +28,23 @@ type Client struct {
 	channelProvider *channelProvider
 }
 
-// NewAdminClient creates a new AdminClient instance.
-//   - seeds: A list of seed hosts to connect to.
-//   - listenerName: The name of the listener to connect to as configured on the
-//     server.
-//   - isLoadBalancer: Whether the client should consider the seed a load balancer.
-//     Only the first seed is considered. Subsequent seeds are ignored.
-//   - username: The username to authenticate with.
-//   - password: The password to authenticate with.
-//   - tlsConfig: The TLS configuration to use for the connection.
-//   - logger: The logger to use for logging.
+// NewClient creates a new Client instance.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	seeds (HostPortSlice): A list of seed hosts to connect to.
+//	listenerName (*string): The name of the listener to connect to as configured on the server.
+//	isLoadBalancer (bool): Whether the client should consider the seed a load balancer.
+//	Only the first seed is considered. Subsequent seeds are ignored.
+//	credentials (*UserPassCredentials): The credentials to authenticate with.
+//	tlsConfig (*tls.Config): The TLS configuration to use for the connection.
+//	logger (*slog.Logger): The logger to use for logging.
+//
+// Returns:
+//
+//	*Client: A new Client instance.
+//	error: An error if the client creation fails, otherwise nil.
 func NewClient(
 	ctx context.Context,
 	seeds HostPortSlice,
@@ -69,13 +77,25 @@ func NewClient(
 	}, nil
 }
 
-// Close closes the AdminClient and releases any resources associated with it.
+// Close closes the Client and releases any resources associated with it.
+//
+// Returns:
+//
+//	error: An error if the closure fails, otherwise nil.
 func (c *Client) Close() error {
 	c.logger.Info("Closing client")
 	return c.channelProvider.Close()
 }
 
-func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+func (c *Client) put(
+	ctx context.Context,
+	writeType protos.WriteType,
+	namespace string,
+	set *string,
+	key any,
+	recordData map[string]any,
+	ignoreMemQueueFull bool,
+) error {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
 		slog.Any("key", key),
@@ -83,23 +103,20 @@ func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace 
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return NewAVSError(failedToInsertRecord, err)
 	}
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return NewAVSError(failedToInsertRecord, err)
 	}
 
 	fields, err := protos.ConvertToFields(recordData)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return NewAVSError(failedToInsertRecord, err)
 	}
 
 	putReq := &protos.PutRequest{
@@ -111,30 +128,117 @@ func (c *Client) put(ctx context.Context, writeType protos.WriteType, namespace 
 
 	_, err = conn.transactClient.Put(ctx, putReq)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.ErrorContext(ctx, msg, slog.Any("error", err))
-		return NewAVSErrorFromGrpc(msg, err)
+		logger.ErrorContext(ctx, failedToInsertRecord, slog.Any("error", err))
+		return NewAVSErrorFromGrpc(failedToInsertRecord, err)
 	}
 
 	return err
 }
 
-func (c *Client) Insert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+// Insert inserts a new record into the specified namespace and set. If the
+// record already exists, it will fail.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to insert.
+//	set (*string): The set within the namespace where the record resides.
+//	key (any): The key of the record to insert.
+//	recordData (map[string]any): The data of the record to insert.
+//	ignoreMemQueueFull (bool): Whether to ignore the in-memory queue full error.
+//
+// Returns:
+//
+//	error: An error if the insertion fails, otherwise nil.
+func (c *Client) Insert(
+	ctx context.Context,
+	namespace string,
+	set *string,
+	key any,
+	recordData map[string]any,
+	ignoreMemQueueFull bool,
+) error {
 	c.logger.InfoContext(ctx, "inserting record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_INSERT_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
-func (c *Client) Update(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
+// Update updates a record in the specified namespace and set. If the record
+// does not already exist, it will fail.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to update.
+//	set (*string): The set within the namespace where the record resides.
+//	key (any): The key of the record to update.
+//	recordData (map[string]any): The data of the record to update.
+//	ignoreMemQueueFull (bool): Whether to ignore the in-memory queue full error.
+//
+// Returns:
+//
+//	error: An error if the update fails, otherwise nil.
+func (c *Client) Update(
+	ctx context.Context,
+	namespace string,
+	set *string,
+	key any,
+	recordData map[string]any,
+	ignoreMemQueueFull bool,
+) error {
 	c.logger.InfoContext(ctx, "updating record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_UPDATE_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
-func (c *Client) Upsert(ctx context.Context, namespace string, set *string, key any, recordData map[string]any, ignoreMemQueueFull bool) error {
-	c.logger.InfoContext(ctx, "upserting record", slog.String("namespace", namespace), slog.Any("set", set), slog.Any("key", key))
+// Upsert inserts or updates a record into the specified namespace and set,
+// regardless of whether the record exists.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to upsert.
+//	set (*string): The set within the namespace where the record resides.
+//	key (any): The key of the record to upsert.
+//	recordData (map[string]any): The data of the record to upsert.
+//	ignoreMemQueueFull (bool): Whether to ignore the in-memory queue full error.
+//
+// Returns:
+//
+//	error: An error if the upsert fails, otherwise nil.
+func (c *Client) Upsert(
+	ctx context.Context,
+	namespace string,
+	set *string,
+	key any,
+	recordData map[string]any,
+	ignoreMemQueueFull bool,
+) error {
+	c.logger.InfoContext(
+		ctx,
+		"upserting record",
+		slog.String("namespace", namespace),
+		slog.Any("set", set),
+		slog.Any("key", key),
+	)
+
 	return c.put(ctx, protos.WriteType_UPSERT, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
-//nolint:revive // TODO
+// Get retrieves a record from the specified namespace and set. If the record
+// does not exist, an error is returned.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to retrieve.
+//	set (*string): The set within the namespace where the record resides.
+//	key (any): The key of the record to retrieve.
+//	includeFields ([]string): Fields to include in the response.
+//	excludeFields ([]string): Fields to exclude from the response.
+//
+// Returns:
+//
+//	*Record: The retrieved record.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) Get(ctx context.Context,
 	namespace string,
 	set *string,
@@ -152,14 +256,14 @@ func (c *Client) Get(ctx context.Context,
 	if err != nil {
 		msg := "failed to get record"
 		logger.Error(msg, slog.Any("error", err))
+
 		return nil, NewAVSError(msg, err)
 	}
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return nil, NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return nil, NewAVSError(failedToInsertRecord, err)
 	}
 
 	getReq := &protos.GetRequest{
@@ -171,6 +275,7 @@ func (c *Client) Get(ctx context.Context,
 	if err != nil {
 		msg := "failed to get record"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
@@ -179,7 +284,18 @@ func (c *Client) Get(ctx context.Context,
 	return newRecordFromProto(record), nil
 }
 
-//nolint:revive // TODO
+// Delete removes a record from the database.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to delete.
+//	set (*string): The set within the namespace where the record resides.
+//	key (any): The key of the record to delete.
+//
+// Returns:
+//
+//	error: An error if the deletion fails, otherwise nil.
 func (c *Client) Delete(ctx context.Context, namespace string, set *string, key any) error {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
@@ -195,9 +311,8 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return NewAVSError(failedToInsertRecord, err)
 	}
 
 	getReq := &protos.DeleteRequest{
@@ -209,7 +324,19 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 	return err
 }
 
-//nolint:revive // TODO
+// Exists checks if a record exists in the specified namespace and set.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to check.
+//	set (*string): The set within the namespace where the record resides.
+//	key (any): The key of the record to check.
+//
+// Returns:
+//
+//	bool: True if the record exists, false otherwise.
+//	error: An error if the existence check fails, otherwise nil.
 func (c *Client) Exists(
 	ctx context.Context,
 	namespace string,
@@ -230,9 +357,8 @@ func (c *Client) Exists(
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return false, NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return false, NewAVSError(failedToInsertRecord, err)
 	}
 
 	existsReq := &protos.ExistsRequest{
@@ -244,8 +370,27 @@ func (c *Client) Exists(
 	return boolean.GetValue(), err
 }
 
-//nolint:revive // TODO
-func (c *Client) IsIndexed(ctx context.Context, namespace string, set *string, indexName string, key any) (bool, error) {
+// IsIndexed checks if a record is indexed in the specified namespace and index.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the record to check.
+//	set (*string): The set within the namespace where the record resides.
+//	indexName (string): The name of the index.
+//	key (any): The key of the record to check.
+//
+// Returns:
+//
+//	bool: True if the record is indexed, false otherwise.
+//	error: An error if the index check fails, otherwise nil.
+func (c *Client) IsIndexed(
+	ctx context.Context,
+	namespace string,
+	set *string,
+	indexName string,
+	key any,
+) (bool, error) {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
 		slog.String("indexName", indexName),
@@ -261,9 +406,8 @@ func (c *Client) IsIndexed(ctx context.Context, namespace string, set *string, i
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		msg := "failed to insert record"
-		logger.Error(msg, slog.Any("error", err))
-		return false, NewAVSError(msg, err)
+		logger.Error(failedToInsertRecord, slog.Any("error", err))
+		return false, NewAVSError(failedToInsertRecord, err)
 	}
 
 	isIndexedReq := &protos.IsIndexedRequest{
@@ -309,6 +453,7 @@ func (c *Client) vectorSearch(ctx context.Context,
 	if err != nil {
 		msg := "failed to search for vector"
 		logger.Error(msg, slog.Any("error", err))
+
 		return nil, NewAVSError(msg, err)
 	}
 
@@ -321,10 +466,12 @@ func (c *Client) vectorSearch(ctx context.Context,
 			if err != io.EOF {
 				msg := "failed to receive all neighbors"
 				logger.Error(msg, slog.Any("error", err))
+
 				return neighbors, NewAVSError(msg, err)
 			}
 
 			logger.DebugContext(ctx, "received all neighbors", slog.Any("neighbors", neighbors))
+
 			return neighbors, nil
 		}
 
@@ -332,6 +479,7 @@ func (c *Client) vectorSearch(ctx context.Context,
 		if err != nil {
 			msg := "failed to convert neighbor"
 			logger.Error(msg, slog.Any("error", err))
+
 			return neighbors, NewAVSError(msg, err)
 		}
 
@@ -339,15 +487,24 @@ func (c *Client) vectorSearch(ctx context.Context,
 	}
 }
 
-// VectorSearchFloat32 searches for the nearest neighbors of the query vector in the
-// specified index. It takes the following parameters:
-//   - namespace: The namespace of the index.
-//   - indexName: The name of the index.
-//   - query: The query vector.
-//   - limit: The maximum number of neighbors to return.
-//   - searchParams: Extra options sent to the server to configure behavior of the
-//     HNSW algorithm.
-//   - projections: Extra options to configure the behavior of the which keys
+// VectorSearchFloat32 searches for the nearest neighbors of the query vector in
+// the specified index.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	indexName (string): The name of the index.
+//	query ([]float32): The query vector.
+//	limit (uint32): The maximum number of neighbors to return.
+//	searchParams (*protos.HnswSearchParams): Extra options to configure the behavior of the HNSW algorithm.
+//	includeFields ([]string): Fields to include in the response.
+//	excludeFields ([]string): Fields to exclude from the response.
+//
+// Returns:
+//
+//	[]*Neighbor: A list of the nearest neighbors.
+//	error: An error if the search fails, otherwise nil.
 func (c *Client) VectorSearchFloat32(
 	ctx context.Context,
 	namespace,
@@ -361,6 +518,7 @@ func (c *Client) VectorSearchFloat32(
 	c.logger.InfoContext(ctx, "searching for float vector")
 
 	vector := protos.CreateFloat32Vector(query)
+
 	return c.vectorSearch(
 		ctx,
 		namespace,
@@ -373,15 +531,24 @@ func (c *Client) VectorSearchFloat32(
 	)
 }
 
-// VectorSearchBool searches for the nearest neighbors of the query vector in the
-// specified index. It takes the following parameters:
-//   - namespace: The namespace of the index.
-//   - indexName: The name of the index.
-//   - query: The query vector.
-//   - limit: The maximum number of neighbors to return.
-//   - searchParams: Extra options sent to the server to configure behavior of the
-//     HNSW algorithm.
-//   - projections: Extra options to configure the behavior of the which keys
+// VectorSearchBool searches for the nearest neighbors of the query vector in
+// the specified index.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	indexName (string): The name of the index.
+//	query ([]bool): The query vector.
+//	limit (uint32): The maximum number of neighbors to return.
+//	searchParams (*protos.HnswSearchParams): Extra options to configure the behavior of the HNSW algorithm.
+//	includeFields ([]string): Fields to include in the response.
+//	excludeFields ([]string): Fields to exclude from the response.
+//
+// Returns:
+//
+//	[]*Neighbor: A list of the nearest neighbors.
+//	error: An error if the search fails, otherwise nil.
 func (c *Client) VectorSearchBool(ctx context.Context,
 	namespace,
 	indexName string,
@@ -394,6 +561,7 @@ func (c *Client) VectorSearchBool(ctx context.Context,
 	c.logger.InfoContext(ctx, "searching for bool vector")
 
 	vector := protos.CreateBoolVector(query)
+
 	return c.vectorSearch(
 		ctx,
 		namespace,
@@ -406,8 +574,31 @@ func (c *Client) VectorSearchBool(ctx context.Context,
 	)
 }
 
-//nolint:revive // TODO
-func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexName string, waitInterval time.Duration) error {
+// WaitForIndexCompletion waits for an index to be fully created. USE WITH
+// CAUTION. This API will likely break in the future as a mechanism for
+// correctly determining index completion is figured out. The wait interval
+// determines the number of times the unmerged record queue must be of size 0.
+// If the unmerged queue size is not zero, it will immediately return the next time a
+// the unmerged queue size is zero. We have found that a good waitInterval is
+// roughly 12 seconds. If you are expected to have many concurrent writers or a
+// consistent stream of writes this will cause your application to hang.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	indexName (string): The name of the index.
+//	waitInterval (time.Duration): The interval to wait between checks.
+//
+// Returns:
+//
+//	error: An error if waiting for the index to complete fails, otherwise nil.
+func (c *Client) WaitForIndexCompletion(
+	ctx context.Context,
+	namespace,
+	indexName string,
+	waitInterval time.Duration,
+) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.InfoContext(ctx, "waiting for index completion")
 
@@ -430,7 +621,7 @@ func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexNam
 	defer timer.Stop()
 
 	for {
-		status, err := conn.indexClient.GetStatus(ctx, indexID)
+		indexStatus, err := conn.indexClient.GetStatus(ctx, indexID)
 		if err != nil {
 			logger.ErrorContext(ctx, "failed to wait for index completion", slog.Any("error", err))
 			return err
@@ -438,18 +629,20 @@ func (c *Client) WaitForIndexCompletion(ctx context.Context, namespace, indexNam
 
 		// We consider the index completed when unmerged record count == 0 for
 		// 2 cycles OR unmerged record count != 0 and now it == 0.
-		unmerged := status.GetUnmergedRecordCount()
+		unmerged := indexStatus.GetUnmergedRecordCount()
 		if unmerged == 0 {
 			if unmergedZeroCount >= 2 || unmergedNotZeroCount >= 1 {
 				logger.InfoContext(ctx, "index completed", slog.Duration("duration", time.Since(startTime)))
 				return nil
 			}
 
-			unmergedZeroCount += 1
+			unmergedZeroCount++
+
 			logger.DebugContext(ctx, "index not yet completed", slog.Int64("unmerged", unmerged))
 		} else {
 			logger.DebugContext(ctx, "index not yet completed", slog.Int64("unmerged", unmerged))
-			unmergedNotZeroCount += 1
+
+			unmergedNotZeroCount--
 		}
 
 		timer.Reset(waitInterval)
@@ -477,16 +670,21 @@ type IndexCreateOpts struct {
 	Sets       []string
 }
 
-// IndexCreate creates a new Aerospike Vector Index and blocks until it is created.
-// It takes the following parameters:
-//   - namespace: The namespace of the index.
-//   - name: The name of the index.
-//   - vectorField: The field to create the index on.
-//   - dimensions: The number of dimensions in the vector.
-//   - vectorDistanceMetric: The distance metric to use for the index.
-//   - opts: Optional fields to configure the index
+// IndexCreate creates a new Aerospike Vector Index.
 //
-// It returns an error if the index creation fails.
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	name (string): The name of the index.
+//	vectorField (string): The field to create the index on.
+//	dimensions (uint32): The number of dimensions in the vector.
+//	vectorDistanceMetric (protos.VectorDistanceMetric): The distance metric to use for the index.
+//	opts (*IndexCreateOpts): Optional fields to configure the index.
+//
+// Returns:
+//
+//	error: An error if the index creation fails, otherwise nil.
 func (c *Client) IndexCreate(
 	ctx context.Context,
 	namespace string,
@@ -540,10 +738,19 @@ func (c *Client) IndexCreate(
 	return c.IndexCreateFromIndexDef(ctx, indexDef)
 }
 
-// IndexCreateFromIndexDef creates a new Aerospike Vector Index from a provided
-// IndexDefinition and blocks until it is created. It can be easily used in
-// conjunction with IndexList and IndexGet to create a new index using the
-// returned IndexDefinitions.
+// IndexUpdate updates an existing Aerospike Vector Index's dynamic configuration params.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	name (string): The name of the index.
+//	metadata (map[string]string): Metadata to update.
+//	hnswParams (*protos.HnswIndexUpdate): The new HNSW params to apply to the index.
+//
+// Returns:
+//
+//	error: An error if the index update fails, otherwise nil.
 func (c *Client) IndexCreateFromIndexDef(
 	ctx context.Context,
 	indexDef *protos.IndexDefinition,
@@ -573,8 +780,19 @@ func (c *Client) IndexCreateFromIndexDef(
 	return c.waitForIndexCreation(ctx, indexDef.Id.Namespace, indexDef.Id.Name, indexWaitDuration)
 }
 
-// IndexUpdate updates an existing Aerospike Vector Index's dynamic
-// configuration params
+// IndexUpdate updates an existing Aerospike Vector Index's dynamic configuration parameters.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	name (string): The name of the index.
+//	metadata (map[string]string): Metadata to update on the index.
+//	hnswParams (*protos.HnswIndexUpdate): The HNSW parameters to update.
+//
+// Returns:
+//
+//	error: An error if the update fails, otherwise nil.
 func (c *Client) IndexUpdate(
 	ctx context.Context,
 	namespace string,
@@ -616,7 +834,17 @@ func (c *Client) IndexUpdate(
 	return nil
 }
 
-// IndexDrop drops an existing Aerospike Vector Index and blocks until it is.
+// IndexDrop drops an existing Aerospike Vector Index and blocks until it is fully removed.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index to drop.
+//	name (string): The name of the index to drop.
+//
+// Returns:
+//
+//	error: An error if the index drop fails, otherwise nil.
 func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "dropping index")
@@ -649,8 +877,16 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 	return c.waitForIndexDrop(ctx, namespace, name, indexWaitDuration)
 }
 
-// IndexList returns a list of all Aerospike Vector Indexes. To get a single
-// index use IndexGet.
+// IndexList returns a list of all Aerospike Vector Indexes.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//
+// Returns:
+//
+//	*protos.IndexDefinitionList: A list of index definitions.
+//	error: An error if the list retrieval fails, otherwise nil.
 func (c *Client) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
 	c.logger.InfoContext(ctx, "listing indexes")
 
@@ -675,8 +911,18 @@ func (c *Client) IndexList(ctx context.Context) (*protos.IndexDefinitionList, er
 	return indexList, nil
 }
 
-// IndexGet returns the definition of an Aerospike Vector Index. To get all
-// indexes use IndexList.
+// IndexGet returns the definition of an Aerospike Vector Index.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	name (string): The name of the index.
+//
+// Returns:
+//
+//	*protos.IndexDefinition: The index definition.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "getting index")
@@ -706,6 +952,17 @@ func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.
 }
 
 // IndexGetStatus returns the status of an Aerospike Vector Index.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	name (string): The name of the index.
+//
+// Returns:
+//
+//	*protos.IndexStatusResponse: The index status.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 	logger.InfoContext(ctx, "getting index status")
@@ -735,6 +992,17 @@ func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*p
 }
 
 // GcInvalidVertices garbage collects invalid vertices in an Aerospike Vector Index.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	namespace (string): The namespace of the index.
+//	name (string): The name of the index.
+//	cutoffTime (time.Time): The cutoff time for the garbage collection.
+//
+// Returns:
+//
+//	error: An error if the garbage collection fails, otherwise nil.
 func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
@@ -772,6 +1040,17 @@ func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, 
 }
 
 // CreateUser creates a new user with the provided username, password, and roles.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	username (string): The username of the new user.
+//	password (string): The password for the new user.
+//	roles ([]string): The roles to assign to the new user.
+//
+// Returns:
+//
+//	error: An error if the user creation fails, otherwise nil.
 func (c *Client) CreateUser(ctx context.Context, username, password string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "creating user")
@@ -801,6 +1080,16 @@ func (c *Client) CreateUser(ctx context.Context, username, password string, role
 }
 
 // UpdateCredentials updates the password for the provided username.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	username (string): The username of the user.
+//	password (string): The new password for the user.
+//
+// Returns:
+//
+//	error: An error if the credential update fails, otherwise nil.
 func (c *Client) UpdateCredentials(ctx context.Context, username, password string) error {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "updating user credentials")
@@ -829,6 +1118,15 @@ func (c *Client) UpdateCredentials(ctx context.Context, username, password strin
 }
 
 // DropUser deletes the user with the provided username.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	username (string): The username of the user to delete.
+//
+// Returns:
+//
+//	error: An error if the user deletion fails, otherwise nil.
 func (c *Client) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "dropping user")
@@ -857,6 +1155,16 @@ func (c *Client) DropUser(ctx context.Context, username string) error {
 }
 
 // GetUser returns the user with the provided username.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	username (string): The username of the user to retrieve.
+//
+// Returns:
+//
+//	*protos.User: The retrieved user.
+//	error: An error if the user retrieval fails, otherwise nil.
 func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, error) {
 	logger := c.logger.With(slog.String("username", username))
 	logger.InfoContext(ctx, "getting user")
@@ -885,6 +1193,15 @@ func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, er
 }
 
 // ListUsers returns a list of all users.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//
+// Returns:
+//
+//	*protos.ListUsersResponse: A list of all users.
+//	error: An error if the list retrieval fails, otherwise nil.
 func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
 	c.logger.InfoContext(ctx, "listing users")
 
@@ -908,6 +1225,16 @@ func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, erro
 }
 
 // GrantRoles grants the provided roles to the user with the provided username.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	username (string): The username of the user.
+//	roles ([]string): The roles to grant to the user.
+//
+// Returns:
+//
+//	error: An error if the role grant fails, otherwise nil.
 func (c *Client) GrantRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "granting user roles")
@@ -937,6 +1264,16 @@ func (c *Client) GrantRoles(ctx context.Context, username string, roles []string
 }
 
 // RevokeRoles revokes the provided roles from the user with the provided username.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	username (string): The username of the user.
+//	roles ([]string): The roles to revoke from the user.
+//
+// Returns:
+//
+//	error: An error if the role revocation fails, otherwise nil.
 func (c *Client) RevokeRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.InfoContext(ctx, "revoking user roles")
@@ -966,6 +1303,15 @@ func (c *Client) RevokeRoles(ctx context.Context, username string, roles []strin
 }
 
 // ListRoles returns a list of all roles.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//
+// Returns:
+//
+//	*protos.ListRolesResponse: A list of all roles.
+//	error: An error if the list retrieval fails, otherwise nil.
 func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
 	c.logger.InfoContext(ctx, "listing roles")
 
@@ -988,8 +1334,17 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 	return rolesResp, nil
 }
 
-// NodeIds returns a list of all the node ids that the client is connected to.
-// If a node is accessible but not a part of the cluster it will not be returned.
+// NodeIDs returns a list of all the node IDs that the client is connected to.
+// If a node is accessible but not a part of the cluster it will not be
+// returned.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//
+// Returns:
+//
+//	[]*protos.NodeId: A list of node IDs.
 func (c *Client) NodeIDs(ctx context.Context) []*protos.NodeId {
 	c.logger.InfoContext(ctx, "getting cluster info")
 
@@ -1005,9 +1360,17 @@ func (c *Client) NodeIDs(ctx context.Context) []*protos.NodeId {
 	return nodeIDs
 }
 
-// ConnectedNodeEndpoint returns the endpoint used to connect to a node. If
-// nodeID is nil then an endpoint used to connect to your seed (or
-// load-balancer) is used.
+// ConnectedNodeEndpoint returns the endpoint used to connect to a node.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	nodeID (*protos.NodeId): The ID of the node. If nil, the seed (or LB) node is used.
+//
+// Returns:
+//
+//	*protos.ServerEndpoint: The server endpoint.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) ConnectedNodeEndpoint(
 	ctx context.Context,
 	nodeID *protos.NodeId,
@@ -1053,8 +1416,17 @@ func (c *Client) ConnectedNodeEndpoint(
 	return &resp, nil
 }
 
-// ClusteringState returns the state of the cluster according the
-// given node.  If nodeID is nil then the seed node is used.
+// ClusteringState returns the state of the cluster according to the given node.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	nodeID (*protos.NodeId): The ID of the node. If nil, the seed node is used.
+//
+// Returns:
+//
+//	*protos.ClusteringState: The clustering state.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*protos.ClusteringState, error) {
 	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeID", nodeID))
 
@@ -1087,9 +1459,18 @@ func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*p
 	return state, nil
 }
 
-// ClusterEndpoints returns the endpoints of all the nodes in the cluster
-// according to the specified node. If nodeID is nil then the seed node is used.
-// If listenerName is nil then the default listener name is used.
+// ClusterEndpoints returns the endpoints of all the nodes in the cluster according to the specified node.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	nodeID (*protos.NodeId): The ID of the node. If nil, the seed node is used.
+//	listenerName (*string): The name of the listener. If nil, the default listener is used.
+//
+// Returns:
+//
+//	*protos.ClusterNodeEndpoints: The cluster node endpoints.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) ClusterEndpoints(
 	ctx context.Context,
 	nodeID *protos.NodeId,
@@ -1130,8 +1511,17 @@ func (c *Client) ClusterEndpoints(
 	return endpoints, nil
 }
 
-// About returns information about the provided node. If nodeID is nil
-// then the seed node is used.
+// About returns information about the provided node.
+//
+// Args:
+//
+//	ctx (context.Context): The context for the operation.
+//	nodeID (*protos.NodeId): The ID of the node. If nil, the seed node is used.
+//
+// Returns:
+//
+//	*protos.AboutResponse: Information about the node.
+//	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.AboutResponse, error) {
 	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
 
