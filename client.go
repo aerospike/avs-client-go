@@ -232,8 +232,8 @@ func (c *Client) Upsert(
 //	namespace (string): The namespace of the record to retrieve.
 //	set (*string): The set within the namespace where the record resides.
 //	key (any): The key of the record to retrieve.
-//	includeFields ([]string): Fields to include in the response.
-//	excludeFields ([]string): Fields to exclude from the response.
+//	includeFields ([]string): Fields to include in the response. Default is all.
+//	excludeFields ([]string): Fields to exclude from the response. Default is none.
 //
 // Returns:
 //
@@ -498,8 +498,8 @@ func (c *Client) vectorSearch(ctx context.Context,
 //	query ([]float32): The query vector.
 //	limit (uint32): The maximum number of neighbors to return.
 //	searchParams (*protos.HnswSearchParams): Extra options to configure the behavior of the HNSW algorithm.
-//	includeFields ([]string): Fields to include in the response.
-//	excludeFields ([]string): Fields to exclude from the response.
+//	includeFields ([]string): Fields to include in the response. Default is all.
+//	includeFields ([]string): Fields to include in the excludeFields ([]string): Fields to exclude from the response. Default is none.. Default is all.
 //
 // Returns:
 //
@@ -542,8 +542,8 @@ func (c *Client) VectorSearchFloat32(
 //	query ([]bool): The query vector.
 //	limit (uint32): The maximum number of neighbors to return.
 //	searchParams (*protos.HnswSearchParams): Extra options to configure the behavior of the HNSW algorithm.
-//	includeFields ([]string): Fields to include in the response.
-//	excludeFields ([]string): Fields to exclude from the response.
+//	includeFields ([]string): Fields to include in the response. Default is all.
+//	includeFields ([]string): Fields to include in the excludeFields ([]string): Fields to exclude from the response. Default is none.. Default is all.
 //
 // Returns:
 //

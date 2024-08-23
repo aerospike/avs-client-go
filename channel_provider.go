@@ -25,7 +25,8 @@ var errChannelProviderClosed = errors.New("channel provider is closed")
 
 // connection represents a gRPC client connection and all the clients (stubs)
 // for the various AVS services. It's main purpose to remove the need to create
-// multiple clients for the same connection.
+// multiple clients for the same connection. This follows the documented grpc
+// best practice of reusing connections.
 type connection struct {
 	grpcConn          *grpc.ClientConn
 	transactClient    protos.TransactServiceClient
