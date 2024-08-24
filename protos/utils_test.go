@@ -58,6 +58,16 @@ func TestConvertToKey(t *testing.T) {
 			},
 		},
 		{
+			input: int(123456789),
+			expected: &Key{
+				Namespace: "testNamespace",
+				Set:       GetStrPtr("testSet"),
+				Value: &Key_LongValue{
+					LongValue: 123456789,
+				},
+			},
+		},
+		{
 			input:       &keyUnknown{},
 			expected:    nil, // Unsupported type
 			expectedErr: fmt.Errorf("unsupported key type: *protos.keyUnknown"),

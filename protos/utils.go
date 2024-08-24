@@ -20,6 +20,8 @@ func ConvertToKey(namespace string, set *string, key any) (*Key, error) {
 		k.Value = &Key_IntValue{IntValue: v}
 	case int64:
 		k.Value = &Key_LongValue{LongValue: v}
+	case int:
+		k.Value = &Key_LongValue{LongValue: int64(v)}
 	default:
 		return nil, fmt.Errorf("unsupported key type: %T", key)
 	}
