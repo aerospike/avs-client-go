@@ -4,6 +4,7 @@ package avs
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"log/slog"
 	"strconv"
@@ -19,7 +20,13 @@ import (
 const (
 	indexTimeoutDuration = time.Second * 100
 	indexWaitDuration    = time.Millisecond * 100
-	failedToInsertRecord = "failed to insert record"
+)
+const (
+	failedToInsertRecord      = "failed to insert record"
+	failedToGetRecord         = "failed to get record"
+	failedToDeleteRecord      = "failed to delete record"
+	failedToCheckRecordExists = "failed to check if record exists"
+	failedToCheckIsIndexed    = "failed to check if record exists"
 )
 
 // Client is a client for managing Aerospike Vector Indexes.
@@ -158,7 +165,7 @@ func (c *Client) Insert(
 	recordData map[string]any,
 	ignoreMemQueueFull bool,
 ) error {
-	c.logger.InfoContext(ctx, "inserting record", slog.String("namespace", namespace), slog.Any("key", key))
+	c.logger.DebugContext(ctx, "inserting record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_INSERT_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
@@ -185,7 +192,7 @@ func (c *Client) Update(
 	recordData map[string]any,
 	ignoreMemQueueFull bool,
 ) error {
-	c.logger.InfoContext(ctx, "updating record", slog.String("namespace", namespace), slog.Any("key", key))
+	c.logger.DebugContext(ctx, "updating record", slog.String("namespace", namespace), slog.Any("key", key))
 	return c.put(ctx, protos.WriteType_UPDATE_ONLY, namespace, set, key, recordData, ignoreMemQueueFull)
 }
 
@@ -212,7 +219,7 @@ func (c *Client) Upsert(
 	recordData map[string]any,
 	ignoreMemQueueFull bool,
 ) error {
-	c.logger.InfoContext(
+	c.logger.DebugContext(
 		ctx,
 		"upserting record",
 		slog.String("namespace", namespace),
@@ -250,20 +257,18 @@ func (c *Client) Get(ctx context.Context,
 		slog.String("namespace", namespace),
 		slog.Any("key", key),
 	)
-	logger.InfoContext(ctx, "getting record")
+	logger.DebugContext(ctx, "getting record")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		msg := "failed to get record"
-		logger.Error(msg, slog.Any("error", err))
-
-		return nil, NewAVSError(msg, err)
+		logger.Error(failedToGetRecord, slog.Any("error", err))
+		return nil, NewAVSError(failedToGetRecord, err)
 	}
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		logger.Error(failedToInsertRecord, slog.Any("error", err))
-		return nil, NewAVSError(failedToInsertRecord, err)
+		logger.Error(failedToGetRecord, slog.Any("error", err))
+		return nil, NewAVSError(failedToGetRecord, err)
 	}
 
 	getReq := &protos.GetRequest{
@@ -273,10 +278,8 @@ func (c *Client) Get(ctx context.Context,
 
 	record, err := conn.transactClient.Get(ctx, getReq)
 	if err != nil {
-		msg := "failed to get record"
-		logger.ErrorContext(ctx, msg, slog.Any("error", err))
-
-		return nil, NewAVSErrorFromGrpc(msg, err)
+		logger.ErrorContext(ctx, failedToGetRecord, slog.Any("error", err))
+		return nil, NewAVSErrorFromGrpc(failedToGetRecord, err)
 	}
 
 	logger.Debug("received record", slog.Any("record", record.Fields))
@@ -301,12 +304,12 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 		slog.String("namespace", namespace),
 		slog.Any("key", key),
 	)
-	logger.InfoContext(ctx, "deleting record")
+	logger.DebugContext(ctx, "deleting record")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to delete record", slog.Any("error", err))
-		return err
+		logger.Error(failedToDeleteRecord, slog.Any("error", err))
+		return NewAVSError(failedToDeleteRecord, err)
 	}
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
@@ -320,8 +323,12 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 	}
 
 	_, err = conn.transactClient.Delete(ctx, getReq)
+	if err != nil {
+		logger.Error(failedToDeleteRecord, slog.Any("error", err))
+		return NewAVSErrorFromGrpc(failedToGetRecord, err)
+	}
 
-	return err
+	return nil
 }
 
 // Exists checks if a record exists in the specified namespace and set.
@@ -347,18 +354,18 @@ func (c *Client) Exists(
 		slog.String("namespace", namespace),
 		slog.Any("key", key),
 	)
-	logger.InfoContext(ctx, "checking if record exists")
+	logger.DebugContext(ctx, "checking if record exists")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to check if record exists", slog.Any("error", err))
-		return false, err
+		logger.Error(failedToCheckRecordExists, slog.Any("error", err))
+		return false, NewAVSError(failedToCheckRecordExists, err)
 	}
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		logger.Error(failedToInsertRecord, slog.Any("error", err))
-		return false, NewAVSError(failedToInsertRecord, err)
+		logger.Error(failedToCheckRecordExists, slog.Any("error", err))
+		return false, NewAVSError(failedToCheckRecordExists, err)
 	}
 
 	existsReq := &protos.ExistsRequest{
@@ -366,8 +373,12 @@ func (c *Client) Exists(
 	}
 
 	boolean, err := conn.transactClient.Exists(ctx, existsReq)
+	if err != nil {
+		logger.Error(failedToCheckRecordExists, slog.Any("error", err))
+		return false, NewAVSErrorFromGrpc(failedToCheckRecordExists, err)
+	}
 
-	return boolean.GetValue(), err
+	return boolean.GetValue(), nil
 }
 
 // IsIndexed checks if a record is indexed in the specified namespace and index.
@@ -396,18 +407,18 @@ func (c *Client) IsIndexed(
 		slog.String("indexName", indexName),
 		slog.Any("key", key),
 	)
-	logger.InfoContext(ctx, "checking if record is indexed")
+	logger.DebugContext(ctx, "checking if record is indexed")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to check if record is indexed", slog.Any("error", err))
-		return false, err
+		logger.Error(failedToCheckIsIndexed, slog.Any("error", err))
+		return false, NewAVSError(failedToCheckIsIndexed, err)
 	}
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		logger.Error(failedToInsertRecord, slog.Any("error", err))
-		return false, NewAVSError(failedToInsertRecord, err)
+		logger.Error(failedToCheckIsIndexed, slog.Any("error", err))
+		return false, NewAVSError(failedToCheckIsIndexed, err)
 	}
 
 	isIndexedReq := &protos.IsIndexedRequest{
@@ -415,8 +426,12 @@ func (c *Client) IsIndexed(
 	}
 
 	boolean, err := conn.transactClient.IsIndexed(ctx, isIndexedReq)
+	if err != nil {
+		logger.Error(failedToCheckIsIndexed, slog.Any("error", err))
+		return false, NewAVSErrorFromGrpc(failedToCheckIsIndexed, err)
+	}
 
-	return boolean.GetValue(), err
+	return boolean.GetValue(), nil
 }
 
 // vectorSearch searches for the nearest neighbors of the query vector in the
@@ -432,12 +447,14 @@ func (c *Client) vectorSearch(ctx context.Context,
 	excludeFields []string,
 ) ([]*Neighbor, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
-	logger.InfoContext(ctx, "searching for vector")
+	logger.DebugContext(ctx, "searching for vector")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to search for vector", slog.Any("error", err))
-		return nil, err
+		msg := "failed to search for vector"
+		logger.Error(msg, slog.Any("error", err))
+
+		return nil, NewAVSError(msg, err)
 	}
 
 	vectorSearchReq := createVectorSearchRequest(
@@ -463,7 +480,7 @@ func (c *Client) vectorSearch(ctx context.Context,
 		protoNeigh, err := resp.Recv()
 
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				msg := "failed to receive all neighbors"
 				logger.Error(msg, slog.Any("error", err))
 
@@ -515,7 +532,7 @@ func (c *Client) VectorSearchFloat32(
 	includeFields,
 	excludeFields []string,
 ) ([]*Neighbor, error) {
-	c.logger.InfoContext(ctx, "searching for float vector")
+	c.logger.DebugContext(ctx, "searching for float vector")
 
 	vector := protos.CreateFloat32Vector(query)
 
@@ -558,7 +575,7 @@ func (c *Client) VectorSearchBool(ctx context.Context,
 	includeFields,
 	excludeFields []string,
 ) ([]*Neighbor, error) {
-	c.logger.InfoContext(ctx, "searching for bool vector")
+	c.logger.DebugContext(ctx, "searching for bool vector")
 
 	vector := protos.CreateBoolVector(query)
 
@@ -600,7 +617,7 @@ func (c *Client) WaitForIndexCompletion(
 	waitInterval time.Duration,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
-	logger.InfoContext(ctx, "waiting for index completion")
+	logger.DebugContext(ctx, "waiting for index completion")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -632,7 +649,7 @@ func (c *Client) WaitForIndexCompletion(
 		unmerged := indexStatus.GetUnmergedRecordCount()
 		if unmerged == 0 {
 			if unmergedZeroCount >= 2 || unmergedNotZeroCount >= 1 {
-				logger.InfoContext(ctx, "index completed", slog.Duration("duration", time.Since(startTime)))
+				logger.DebugContext(ctx, "index completed", slog.Duration("duration", time.Since(startTime)))
 				return nil
 			}
 
@@ -695,7 +712,7 @@ func (c *Client) IndexCreate(
 	opts *IndexCreateOpts,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
-	logger.InfoContext(ctx, "creating index")
+	logger.DebugContext(ctx, "creating index")
 
 	var (
 		set     *string
@@ -756,7 +773,7 @@ func (c *Client) IndexCreateFromIndexDef(
 	indexDef *protos.IndexDefinition,
 ) error {
 	logger := c.logger.With(slog.Any("definition", indexDef))
-	logger.InfoContext(ctx, "creating index from definition")
+	logger.DebugContext(ctx, "creating index from definition")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -802,7 +819,7 @@ func (c *Client) IndexUpdate(
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
 
-	logger.InfoContext(ctx, "updating index")
+	logger.DebugContext(ctx, "updating index")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -847,7 +864,7 @@ func (c *Client) IndexUpdate(
 //	error: An error if the index drop fails, otherwise nil.
 func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
-	logger.InfoContext(ctx, "dropping index")
+	logger.DebugContext(ctx, "dropping index")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -888,7 +905,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 //	*protos.IndexDefinitionList: A list of index definitions.
 //	error: An error if the list retrieval fails, otherwise nil.
 func (c *Client) IndexList(ctx context.Context) (*protos.IndexDefinitionList, error) {
-	c.logger.InfoContext(ctx, "listing indexes")
+	c.logger.DebugContext(ctx, "listing indexes")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -925,7 +942,7 @@ func (c *Client) IndexList(ctx context.Context) (*protos.IndexDefinitionList, er
 //	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
-	logger.InfoContext(ctx, "getting index")
+	logger.DebugContext(ctx, "getting index")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -965,7 +982,7 @@ func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.
 //	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
-	logger.InfoContext(ctx, "getting index status")
+	logger.DebugContext(ctx, "getting index status")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1010,7 +1027,7 @@ func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, 
 		slog.Any("cutoffTime", cutoffTime),
 	)
 
-	logger.InfoContext(ctx, "garbage collection invalid vertices")
+	logger.DebugContext(ctx, "garbage collection invalid vertices")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1053,7 +1070,7 @@ func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, 
 //	error: An error if the user creation fails, otherwise nil.
 func (c *Client) CreateUser(ctx context.Context, username, password string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
-	logger.InfoContext(ctx, "creating user")
+	logger.DebugContext(ctx, "creating user")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1092,7 +1109,7 @@ func (c *Client) CreateUser(ctx context.Context, username, password string, role
 //	error: An error if the credential update fails, otherwise nil.
 func (c *Client) UpdateCredentials(ctx context.Context, username, password string) error {
 	logger := c.logger.With(slog.String("username", username))
-	logger.InfoContext(ctx, "updating user credentials")
+	logger.DebugContext(ctx, "updating user credentials")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1129,7 +1146,7 @@ func (c *Client) UpdateCredentials(ctx context.Context, username, password strin
 //	error: An error if the user deletion fails, otherwise nil.
 func (c *Client) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
-	logger.InfoContext(ctx, "dropping user")
+	logger.DebugContext(ctx, "dropping user")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1167,7 +1184,7 @@ func (c *Client) DropUser(ctx context.Context, username string) error {
 //	error: An error if the user retrieval fails, otherwise nil.
 func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, error) {
 	logger := c.logger.With(slog.String("username", username))
-	logger.InfoContext(ctx, "getting user")
+	logger.DebugContext(ctx, "getting user")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1203,7 +1220,7 @@ func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, er
 //	*protos.ListUsersResponse: A list of all users.
 //	error: An error if the list retrieval fails, otherwise nil.
 func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
-	c.logger.InfoContext(ctx, "listing users")
+	c.logger.DebugContext(ctx, "listing users")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1237,7 +1254,7 @@ func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, erro
 //	error: An error if the role grant fails, otherwise nil.
 func (c *Client) GrantRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
-	logger.InfoContext(ctx, "granting user roles")
+	logger.DebugContext(ctx, "granting user roles")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1276,7 +1293,7 @@ func (c *Client) GrantRoles(ctx context.Context, username string, roles []string
 //	error: An error if the role revocation fails, otherwise nil.
 func (c *Client) RevokeRoles(ctx context.Context, username string, roles []string) error {
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
-	logger.InfoContext(ctx, "revoking user roles")
+	logger.DebugContext(ctx, "revoking user roles")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1313,7 +1330,7 @@ func (c *Client) RevokeRoles(ctx context.Context, username string, roles []strin
 //	*protos.ListRolesResponse: A list of all roles.
 //	error: An error if the list retrieval fails, otherwise nil.
 func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
-	c.logger.InfoContext(ctx, "listing roles")
+	c.logger.DebugContext(ctx, "listing roles")
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1346,7 +1363,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 //
 //	[]*protos.NodeId: A list of node IDs.
 func (c *Client) NodeIDs(ctx context.Context) []*protos.NodeId {
-	c.logger.InfoContext(ctx, "getting cluster info")
+	c.logger.DebugContext(ctx, "getting cluster info")
 
 	ids := c.channelProvider.GetNodeIDs()
 	nodeIDs := make([]*protos.NodeId, len(ids))
@@ -1375,19 +1392,9 @@ func (c *Client) ConnectedNodeEndpoint(
 	ctx context.Context,
 	nodeID *protos.NodeId,
 ) (*protos.ServerEndpoint, error) {
-	c.logger.InfoContext(ctx, "getting connected endpoint for node", slog.Any("nodeID", nodeID))
+	c.logger.DebugContext(ctx, "getting connected endpoint for node", slog.Any("nodeID", nodeID))
 
-	var (
-		conn *connection
-		err  error
-	)
-
-	if nodeID == nil {
-		conn, err = c.channelProvider.GetSeedConn()
-	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeID.Id)
-	}
-
+	conn, err := c.getConnection(nodeID)
 	if err != nil {
 		msg := "failed to get connected endpoint"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1428,19 +1435,9 @@ func (c *Client) ConnectedNodeEndpoint(
 //	*protos.ClusteringState: The clustering state.
 //	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*protos.ClusteringState, error) {
-	c.logger.InfoContext(ctx, "getting clustering state for node", slog.Any("nodeID", nodeID))
+	c.logger.DebugContext(ctx, "getting clustering state for node", slog.Any("nodeID", nodeID))
 
-	var (
-		conn *connection
-		err  error
-	)
-
-	if nodeID == nil {
-		conn, err = c.channelProvider.GetSeedConn()
-	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeID.GetId())
-	}
-
+	conn, err := c.getConnection(nodeID)
 	if err != nil {
 		msg := "failed to list roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1476,19 +1473,9 @@ func (c *Client) ClusterEndpoints(
 	nodeID *protos.NodeId,
 	listenerName *string,
 ) (*protos.ClusterNodeEndpoints, error) {
-	c.logger.InfoContext(ctx, "getting cluster endpoints for node", slog.Any("nodeID", nodeID))
+	c.logger.DebugContext(ctx, "getting cluster endpoints for node", slog.Any("nodeID", nodeID))
 
-	var (
-		conn *connection
-		err  error
-	)
-
-	if nodeID == nil {
-		conn, err = c.channelProvider.GetSeedConn()
-	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeID.GetId())
-	}
-
+	conn, err := c.getConnection(nodeID)
 	if err != nil {
 		msg := "failed to get cluster endpoints"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1523,19 +1510,9 @@ func (c *Client) ClusterEndpoints(
 //	*protos.AboutResponse: Information about the node.
 //	error: An error if the retrieval fails, otherwise nil.
 func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.AboutResponse, error) {
-	c.logger.InfoContext(ctx, "getting \"about\" info from nodes")
+	c.logger.DebugContext(ctx, "getting \"about\" info from nodes")
 
-	var (
-		conn *connection
-		err  error
-	)
-
-	if nodeID == nil {
-		conn, err = c.channelProvider.GetSeedConn()
-	} else {
-		conn, err = c.channelProvider.GetNodeConn(nodeID.GetId())
-	}
-
+	conn, err := c.getConnection(nodeID)
 	if err != nil {
 		msg := "failed to make about request"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1552,6 +1529,14 @@ func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.Abou
 	}
 
 	return resp, nil
+}
+
+func (c *Client) getConnection(nodeID *protos.NodeId) (*connection, error) {
+	if nodeID == nil {
+		return c.channelProvider.GetSeedConn()
+	}
+
+	return c.channelProvider.GetNodeConn(nodeID.GetId())
 }
 
 // waitForIndexCreation waits for an index to be created and blocks until it is.
@@ -1592,8 +1577,10 @@ func (c *Client) waitForIndexCreation(ctx context.Context,
 				select {
 				case <-timer.C:
 				case <-ctx.Done():
-					logger.ErrorContext(ctx, "waiting for index creation canceled")
-					return ctx.Err()
+					msg := "waiting for index creation canceled"
+					logger.ErrorContext(ctx, msg)
+
+					return NewAVSError(msg, ctx.Err())
 				}
 			} else {
 				msg := "unable to wait for index creation, an unexpected error occurred"
