@@ -18,6 +18,53 @@ func createUserPassCredential(username, password string) *protos.Credentials {
 	}
 }
 
+func createVectorSearchRequest(
+	namespace,
+	indexName string,
+	vector *protos.Vector,
+	limit uint32,
+	searchParams *protos.HnswSearchParams,
+	projections *protos.ProjectionSpec,
+) *protos.VectorSearchRequest {
+	return &protos.VectorSearchRequest{
+		Index: &protos.IndexId{
+			Namespace: namespace,
+			Name:      indexName,
+		},
+		QueryVector: vector,
+		Limit:       limit,
+		SearchParams: &protos.VectorSearchRequest_HnswSearchParams{
+			HnswSearchParams: searchParams,
+		},
+		Projection: projections,
+	}
+}
+
+func createProjectionSpec(includeFields, excludeFields []string) *protos.ProjectionSpec {
+	spec := &protos.ProjectionSpec{
+		Include: &protos.ProjectionFilter{
+			Type: protos.ProjectionType_ALL,
+		},
+		Exclude: &protos.ProjectionFilter{
+			Type: protos.ProjectionType_NONE,
+		},
+	}
+
+	if includeFields != nil {
+		spec.Include = &protos.ProjectionFilter{
+			Type:   protos.ProjectionType_SPECIFIED,
+			Fields: includeFields,
+		}
+	} else if excludeFields != nil {
+		spec.Exclude = &protos.ProjectionFilter{
+			Type:   protos.ProjectionType_SPECIFIED,
+			Fields: excludeFields,
+		}
+	}
+
+	return spec
+}
+
 var minimumSupportedAVSVersion = newVersion("0.9.0")
 
 type version []any
