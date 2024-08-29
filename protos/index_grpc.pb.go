@@ -24,18 +24,18 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IndexServiceClient interface {
 	// Create an index.
-	Create(ctx context.Context, in *IndexDefinition, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Create(ctx context.Context, in *IndexCreateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Create an index.
 	Update(ctx context.Context, in *IndexUpdateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Drop an index.
-	Drop(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Drop(ctx context.Context, in *IndexDropRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// List available indices.
-	List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IndexDefinitionList, error)
+	List(ctx context.Context, in *IndexListRequest, opts ...grpc.CallOption) (*IndexDefinitionList, error)
 	// Get the index definition.
-	Get(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*IndexDefinition, error)
+	Get(ctx context.Context, in *IndexGetRequest, opts ...grpc.CallOption) (*IndexDefinition, error)
 	// Query status of an index.
 	// NOTE: API is subject to change.
-	GetStatus(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*IndexStatusResponse, error)
+	GetStatus(ctx context.Context, in *IndexStatusRequest, opts ...grpc.CallOption) (*IndexStatusResponse, error)
 	// Garbage collect vertices identified as invalid before cutoff timestamp.
 	GcInvalidVertices(ctx context.Context, in *GcInvalidVerticesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
@@ -48,7 +48,7 @@ func NewIndexServiceClient(cc grpc.ClientConnInterface) IndexServiceClient {
 	return &indexServiceClient{cc}
 }
 
-func (c *indexServiceClient) Create(ctx context.Context, in *IndexDefinition, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *indexServiceClient) Create(ctx context.Context, in *IndexCreateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/Create", in, out, opts...)
 	if err != nil {
@@ -66,7 +66,7 @@ func (c *indexServiceClient) Update(ctx context.Context, in *IndexUpdateRequest,
 	return out, nil
 }
 
-func (c *indexServiceClient) Drop(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *indexServiceClient) Drop(ctx context.Context, in *IndexDropRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/Drop", in, out, opts...)
 	if err != nil {
@@ -75,7 +75,7 @@ func (c *indexServiceClient) Drop(ctx context.Context, in *IndexId, opts ...grpc
 	return out, nil
 }
 
-func (c *indexServiceClient) List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*IndexDefinitionList, error) {
+func (c *indexServiceClient) List(ctx context.Context, in *IndexListRequest, opts ...grpc.CallOption) (*IndexDefinitionList, error) {
 	out := new(IndexDefinitionList)
 	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/List", in, out, opts...)
 	if err != nil {
@@ -84,7 +84,7 @@ func (c *indexServiceClient) List(ctx context.Context, in *emptypb.Empty, opts .
 	return out, nil
 }
 
-func (c *indexServiceClient) Get(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*IndexDefinition, error) {
+func (c *indexServiceClient) Get(ctx context.Context, in *IndexGetRequest, opts ...grpc.CallOption) (*IndexDefinition, error) {
 	out := new(IndexDefinition)
 	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/Get", in, out, opts...)
 	if err != nil {
@@ -93,7 +93,7 @@ func (c *indexServiceClient) Get(ctx context.Context, in *IndexId, opts ...grpc.
 	return out, nil
 }
 
-func (c *indexServiceClient) GetStatus(ctx context.Context, in *IndexId, opts ...grpc.CallOption) (*IndexStatusResponse, error) {
+func (c *indexServiceClient) GetStatus(ctx context.Context, in *IndexStatusRequest, opts ...grpc.CallOption) (*IndexStatusResponse, error) {
 	out := new(IndexStatusResponse)
 	err := c.cc.Invoke(ctx, "/aerospike.vector.IndexService/GetStatus", in, out, opts...)
 	if err != nil {
@@ -116,18 +116,18 @@ func (c *indexServiceClient) GcInvalidVertices(ctx context.Context, in *GcInvali
 // for forward compatibility
 type IndexServiceServer interface {
 	// Create an index.
-	Create(context.Context, *IndexDefinition) (*emptypb.Empty, error)
+	Create(context.Context, *IndexCreateRequest) (*emptypb.Empty, error)
 	// Create an index.
 	Update(context.Context, *IndexUpdateRequest) (*emptypb.Empty, error)
 	// Drop an index.
-	Drop(context.Context, *IndexId) (*emptypb.Empty, error)
+	Drop(context.Context, *IndexDropRequest) (*emptypb.Empty, error)
 	// List available indices.
-	List(context.Context, *emptypb.Empty) (*IndexDefinitionList, error)
+	List(context.Context, *IndexListRequest) (*IndexDefinitionList, error)
 	// Get the index definition.
-	Get(context.Context, *IndexId) (*IndexDefinition, error)
+	Get(context.Context, *IndexGetRequest) (*IndexDefinition, error)
 	// Query status of an index.
 	// NOTE: API is subject to change.
-	GetStatus(context.Context, *IndexId) (*IndexStatusResponse, error)
+	GetStatus(context.Context, *IndexStatusRequest) (*IndexStatusResponse, error)
 	// Garbage collect vertices identified as invalid before cutoff timestamp.
 	GcInvalidVertices(context.Context, *GcInvalidVerticesRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedIndexServiceServer()
@@ -137,22 +137,22 @@ type IndexServiceServer interface {
 type UnimplementedIndexServiceServer struct {
 }
 
-func (UnimplementedIndexServiceServer) Create(context.Context, *IndexDefinition) (*emptypb.Empty, error) {
+func (UnimplementedIndexServiceServer) Create(context.Context, *IndexCreateRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
 }
 func (UnimplementedIndexServiceServer) Update(context.Context, *IndexUpdateRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
-func (UnimplementedIndexServiceServer) Drop(context.Context, *IndexId) (*emptypb.Empty, error) {
+func (UnimplementedIndexServiceServer) Drop(context.Context, *IndexDropRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Drop not implemented")
 }
-func (UnimplementedIndexServiceServer) List(context.Context, *emptypb.Empty) (*IndexDefinitionList, error) {
+func (UnimplementedIndexServiceServer) List(context.Context, *IndexListRequest) (*IndexDefinitionList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
-func (UnimplementedIndexServiceServer) Get(context.Context, *IndexId) (*IndexDefinition, error) {
+func (UnimplementedIndexServiceServer) Get(context.Context, *IndexGetRequest) (*IndexDefinition, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
-func (UnimplementedIndexServiceServer) GetStatus(context.Context, *IndexId) (*IndexStatusResponse, error) {
+func (UnimplementedIndexServiceServer) GetStatus(context.Context, *IndexStatusRequest) (*IndexStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
 func (UnimplementedIndexServiceServer) GcInvalidVertices(context.Context, *GcInvalidVerticesRequest) (*emptypb.Empty, error) {
@@ -172,7 +172,7 @@ func RegisterIndexServiceServer(s grpc.ServiceRegistrar, srv IndexServiceServer)
 }
 
 func _IndexService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IndexDefinition)
+	in := new(IndexCreateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func _IndexService_Create_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: "/aerospike.vector.IndexService/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).Create(ctx, req.(*IndexDefinition))
+		return srv.(IndexServiceServer).Create(ctx, req.(*IndexCreateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -208,7 +208,7 @@ func _IndexService_Update_Handler(srv interface{}, ctx context.Context, dec func
 }
 
 func _IndexService_Drop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IndexId)
+	in := new(IndexDropRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -220,13 +220,13 @@ func _IndexService_Drop_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/aerospike.vector.IndexService/Drop",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).Drop(ctx, req.(*IndexId))
+		return srv.(IndexServiceServer).Drop(ctx, req.(*IndexDropRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _IndexService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(IndexListRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -238,13 +238,13 @@ func _IndexService_List_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/aerospike.vector.IndexService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).List(ctx, req.(*emptypb.Empty))
+		return srv.(IndexServiceServer).List(ctx, req.(*IndexListRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _IndexService_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IndexId)
+	in := new(IndexGetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -256,13 +256,13 @@ func _IndexService_Get_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: "/aerospike.vector.IndexService/Get",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).Get(ctx, req.(*IndexId))
+		return srv.(IndexServiceServer).Get(ctx, req.(*IndexGetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _IndexService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IndexId)
+	in := new(IndexStatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func _IndexService_GetStatus_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: "/aerospike.vector.IndexService/GetStatus",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).GetStatus(ctx, req.(*IndexId))
+		return srv.(IndexServiceServer).GetStatus(ctx, req.(*IndexStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

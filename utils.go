@@ -65,6 +65,15 @@ func createProjectionSpec(includeFields, excludeFields []string) *protos.Project
 	return spec
 }
 
+func createIndexStatusRequest(namespace, name string) *protos.IndexStatusRequest {
+	return &protos.IndexStatusRequest{
+		IndexId: &protos.IndexId{
+			Namespace: namespace,
+			Name:      name,
+		},
+	}
+}
+
 var minimumSupportedAVSVersion = newVersion("0.9.0")
 
 type version []any
