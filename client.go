@@ -613,7 +613,7 @@ func (c *Client) VectorSearchBool(ctx context.Context,
 func (c *Client) WaitForIndexCompletion(
 	ctx context.Context,
 	namespace,
-	indexName string, // TODO: Converge all to name or indexName?
+	indexName string,
 	waitInterval time.Duration,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
@@ -689,7 +689,7 @@ type IndexCreateOpts struct {
 //
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
-//	name (string): The name of the index.
+//	indexName (string): The name of the index.
 //	vectorField (string): The field to create the index on.
 //	dimensions (uint32): The number of dimensions in the vector.
 //	vectorDistanceMetric (protos.VectorDistanceMetric): The distance metric to use for the index.
@@ -701,13 +701,13 @@ type IndexCreateOpts struct {
 func (c *Client) IndexCreate(
 	ctx context.Context,
 	namespace string,
-	name string,
+	indexName string,
 	vectorField string,
 	dimensions uint32,
 	vectorDistanceMetric protos.VectorDistanceMetric,
 	opts *IndexCreateOpts,
 ) error {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "creating index")
 
 	var (
@@ -737,7 +737,7 @@ func (c *Client) IndexCreate(
 	indexDef := &protos.IndexDefinition{
 		Id: &protos.IndexId{
 			Namespace: namespace,
-			Name:      name,
+			Name:      indexName,
 		},
 		Dimensions:           dimensions,
 		VectorDistanceMetric: vectorDistanceMetric,
@@ -813,11 +813,11 @@ func (c *Client) IndexCreateFromIndexDef(
 func (c *Client) IndexUpdate(
 	ctx context.Context,
 	namespace string,
-	name string,
+	indexName string,
 	metadata map[string]string,
 	hnswParams *protos.HnswIndexUpdate,
 ) error {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
 	logger.DebugContext(ctx, "updating index")
 
@@ -832,7 +832,7 @@ func (c *Client) IndexUpdate(
 	indexUpdate := &protos.IndexUpdateRequest{
 		IndexId: &protos.IndexId{
 			Namespace: namespace,
-			Name:      name,
+			Name:      indexName,
 		},
 		Labels: metadata,
 		Update: &protos.IndexUpdateRequest_HnswIndexUpdate{
@@ -857,13 +857,13 @@ func (c *Client) IndexUpdate(
 //
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index to drop.
-//	name (string): The name of the index to drop.
+//	indexName (string): The name of the index to drop.
 //
 // Returns:
 //
 //	error: An error if the index drop fails, otherwise nil.
-func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+func (c *Client) IndexDrop(ctx context.Context, namespace, indexName string) error {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "dropping index")
 
 	conn, err := c.channelProvider.GetRandomConn()
@@ -877,7 +877,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 	indexDropReq := &protos.IndexDropRequest{
 		IndexId: &protos.IndexId{
 			Namespace: namespace,
-			Name:      name,
+			Name:      indexName,
 		},
 	}
 
@@ -893,7 +893,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, name string) error {
 	ctx, cancel := context.WithTimeout(ctx, indexTimeoutDuration)
 	defer cancel()
 
-	return c.waitForIndexDrop(ctx, namespace, name, indexWaitDuration)
+	return c.waitForIndexDrop(ctx, namespace, indexName, indexWaitDuration)
 }
 
 // IndexList returns a list of all Aerospike Vector Indexes.
@@ -940,14 +940,14 @@ func (c *Client) IndexList(ctx context.Context, applyDefaults bool) (*protos.Ind
 //
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
-//	name (string): The name of the index.
+//	indexName (string): The name of the index.
 //
 // Returns:
 //
 //	*protos.IndexDefinition: The index definition.
 //	error: An error if the retrieval fails, otherwise nil.
-func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.IndexDefinition, error) {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+func (c *Client) IndexGet(ctx context.Context, namespace, indexName string) (*protos.IndexDefinition, error) {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "getting index")
 
 	conn, err := c.channelProvider.GetRandomConn()
@@ -961,7 +961,7 @@ func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.
 	indexGetReq := &protos.IndexGetRequest{
 		IndexId: &protos.IndexId{
 			Namespace: namespace,
-			Name:      name,
+			Name:      indexName,
 		},
 	}
 
@@ -982,14 +982,14 @@ func (c *Client) IndexGet(ctx context.Context, namespace, name string) (*protos.
 //
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
-//	name (string): The name of the index.
+//	indexName (string): The name of the index.
 //
 // Returns:
 //
 //	*protos.IndexStatusResponse: The index status.
 //	error: An error if the retrieval fails, otherwise nil.
-func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*protos.IndexStatusResponse, error) {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+func (c *Client) IndexGetStatus(ctx context.Context, namespace, indexName string) (*protos.IndexStatusResponse, error) {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "getting index status")
 
 	conn, err := c.channelProvider.GetRandomConn()
@@ -1000,7 +1000,7 @@ func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*p
 		return nil, NewAVSErrorFromGrpc(msg, err)
 	}
 
-	indexStatusReq := createIndexStatusRequest(namespace, name)
+	indexStatusReq := createIndexStatusRequest(namespace, indexName)
 
 	indexStatus, err := conn.indexClient.GetStatus(ctx, indexStatusReq)
 	if err != nil {
@@ -1019,16 +1019,16 @@ func (c *Client) IndexGetStatus(ctx context.Context, namespace, name string) (*p
 //
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
-//	name (string): The name of the index.
+//	indexName (string): The name of the index.
 //	cutoffTime (time.Time): The cutoff time for the garbage collection.
 //
 // Returns:
 //
 //	error: An error if the garbage collection fails, otherwise nil.
-func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, cutoffTime time.Time) error {
+func (c *Client) GcInvalidVertices(ctx context.Context, namespace, indexName string, cutoffTime time.Time) error {
 	logger := c.logger.With(
 		slog.String("namespace", namespace),
-		slog.String("name", name),
+		slog.String("indexName", indexName),
 		slog.Any("cutoffTime", cutoffTime),
 	)
 
@@ -1045,7 +1045,7 @@ func (c *Client) GcInvalidVertices(ctx context.Context, namespace, name string, 
 	gcRequest := &protos.GcInvalidVerticesRequest{
 		IndexId: &protos.IndexId{
 			Namespace: namespace,
-			Name:      name,
+			Name:      indexName,
 		},
 		CutoffTimestamp: cutoffTime.Unix(),
 	}
@@ -1548,10 +1548,10 @@ func (c *Client) getConnection(nodeID *protos.NodeId) (*connection, error) {
 // The amount of time to wait between each call is defined by waitInterval.
 func (c *Client) waitForIndexCreation(ctx context.Context,
 	namespace,
-	name string,
+	indexName string,
 	waitInterval time.Duration,
 ) error {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1561,7 +1561,7 @@ func (c *Client) waitForIndexCreation(ctx context.Context,
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	indexStatusReq := createIndexStatusRequest(namespace, name)
+	indexStatusReq := createIndexStatusRequest(namespace, indexName)
 	timer := time.NewTimer(waitInterval)
 
 	defer timer.Stop()
@@ -1601,8 +1601,8 @@ func (c *Client) waitForIndexCreation(ctx context.Context,
 
 // waitForIndexDrop waits for an index to be dropped and blocks until it is. The
 // amount of time to wait between each call is defined by waitInterval.
-func (c *Client) waitForIndexDrop(ctx context.Context, namespace, name string, waitInterval time.Duration) error {
-	logger := c.logger.With(slog.String("namespace", namespace), slog.String("name", name))
+func (c *Client) waitForIndexDrop(ctx context.Context, namespace, indexName string, waitInterval time.Duration) error {
+	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
 	conn, err := c.channelProvider.GetRandomConn()
 	if err != nil {
@@ -1612,7 +1612,7 @@ func (c *Client) waitForIndexDrop(ctx context.Context, namespace, name string, w
 		return NewAVSErrorFromGrpc(msg, err)
 	}
 
-	indexStatusReq := createIndexStatusRequest(namespace, name)
+	indexStatusReq := createIndexStatusRequest(namespace, indexName)
 	timer := time.NewTimer(waitInterval)
 
 	defer timer.Stop()
