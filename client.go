@@ -61,7 +61,7 @@ func NewClient(
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*Client, error) {
-	logger = logger.WithGroup("avs.admin")
+	logger = logger.WithGroup("avs")
 	logger.Info("creating new client")
 
 	channelProvider, err := newChannelProvider(

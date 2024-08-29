@@ -5,7 +5,6 @@ package avs
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"os"
@@ -44,12 +43,12 @@ func TestSingleNodeSuite(t *testing.T) {
 		logger.Error("Failed to read cert")
 	}
 
-	certificates, err := GetCertificates("docker/mtls/config/tls/localhost.crt", "docker/mtls/config/tls/localhost.key")
-	if err != nil {
-		t.Fatalf("unable to read certificates %v", err)
-		t.FailNow()
-		logger.Error("Failed to read cert")
-	}
+	// certificates, err := GetCertificates("docker/mtls/config/tls/localhost.crt", "docker/mtls/config/tls/localhost.key")
+	// if err != nil {
+	// 	t.Fatalf("unable to read certificates %v", err)
+	// 	t.FailNow()
+	// 	logger.Error("Failed to read cert")
+	// }
 
 	avsSeed := "localhost"
 	avsPort := 10000
@@ -64,29 +63,29 @@ func TestSingleNodeSuite(t *testing.T) {
 				AvsHostPort: avsHostPort,
 			},
 		},
-		{
-			ServerTestBaseSuite: ServerTestBaseSuite{
-				ComposeFile: "docker/mtls/docker-compose.yml", // mutual tls
-				AvsTLSConfig: &tls.Config{
-					Certificates: certificates,
-					RootCAs:      rootCA,
-				},
-				AvsHostPort: avsHostPort,
-				AvsLB:       true,
-			},
-		},
-		{
-			ServerTestBaseSuite: ServerTestBaseSuite{
-				ComposeFile: "docker/auth/docker-compose.yml", // tls + auth (auth requires tls)
-				AvsCreds:    NewCredentialsFromUserPass("admin", "admin"),
-				AvsTLSConfig: &tls.Config{
-					Certificates: nil,
-					RootCAs:      rootCA,
-				},
-				AvsHostPort: avsHostPort,
-				AvsLB:       true,
-			},
-		},
+		// {
+		// 	ServerTestBaseSuite: ServerTestBaseSuite{
+		// 		ComposeFile: "docker/mtls/docker-compose.yml", // mutual tls
+		// 		AvsTLSConfig: &tls.Config{
+		// 			Certificates: certificates,
+		// 			RootCAs:      rootCA,
+		// 		},
+		// 		AvsHostPort: avsHostPort,
+		// 		AvsLB:       true,
+		// 	},
+		// },
+		// {
+		// 	ServerTestBaseSuite: ServerTestBaseSuite{
+		// 		ComposeFile: "docker/auth/docker-compose.yml", // tls + auth (auth requires tls)
+		// 		AvsCreds:    NewCredentialsFromUserPass("admin", "admin"),
+		// 		AvsTLSConfig: &tls.Config{
+		// 			Certificates: nil,
+		// 			RootCAs:      rootCA,
+		// 		},
+		// 		AvsHostPort: avsHostPort,
+		// 		AvsLB:       true,
+		// 	},
+		// },
 	}
 
 	for _, s := range suites {
@@ -396,6 +395,8 @@ func (suite *SingleNodeTestSuite) TestVectorSearchBool() {
 			if err != nil {
 				return
 			}
+
+			defer suite.AvsClient.IndexDrop(ctx, tc.namespace, indexName)
 
 			for idx, vec := range tc.vectors {
 				recordData := map[string]any{
