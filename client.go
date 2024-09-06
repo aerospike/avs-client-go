@@ -941,12 +941,13 @@ func (c *Client) IndexList(ctx context.Context, applyDefaults bool) (*protos.Ind
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
 //	indexName (string): The name of the index.
+//	applyDefaults (bool): Whether to apply server default values to the index definition.
 //
 // Returns:
 //
 //	*protos.IndexDefinition: The index definition.
 //	error: An error if the retrieval fails, otherwise nil.
-func (c *Client) IndexGet(ctx context.Context, namespace, indexName string) (*protos.IndexDefinition, error) {
+func (c *Client) IndexGet(ctx context.Context, namespace, indexName string, applyDefaults bool) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "getting index")
 
@@ -963,6 +964,7 @@ func (c *Client) IndexGet(ctx context.Context, namespace, indexName string) (*pr
 			Namespace: namespace,
 			Name:      indexName,
 		},
+		ApplyDefaults: &applyDefaults,
 	}
 
 	indexDef, err := conn.indexClient.Get(ctx, indexGetReq)
