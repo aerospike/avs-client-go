@@ -947,7 +947,12 @@ func (c *Client) IndexList(ctx context.Context, applyDefaults bool) (*protos.Ind
 //
 //	*protos.IndexDefinition: The index definition.
 //	error: An error if the retrieval fails, otherwise nil.
-func (c *Client) IndexGet(ctx context.Context, namespace, indexName string, applyDefaults bool) (*protos.IndexDefinition, error) {
+func (c *Client) IndexGet(
+	ctx context.Context,
+	namespace,
+	indexName string,
+	applyDefaults bool,
+) (*protos.IndexDefinition, error) {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "getting index")
 
