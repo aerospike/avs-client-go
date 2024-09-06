@@ -21,6 +21,10 @@ message GcInvalidVerticesRequest {
   int64 cutoffTimestamp = 2;
 }
 
+message IndexCreateRequest {
+  IndexDefinition definition = 1;
+}
+
 message IndexUpdateRequest {
   IndexId  indexId = 1;
 
@@ -32,26 +36,46 @@ message IndexUpdateRequest {
   }
 }
 
+message IndexDropRequest {
+  IndexId indexId = 1;
+}
+
+message IndexListRequest {
+  // Apply default values to parameters which are not set by user.
+  optional bool applyDefaults = 1;
+}
+
+message IndexGetRequest {
+  IndexId  indexId = 1;
+
+  // Apply default values to parameters which are not set by user.
+  optional bool applyDefaults = 2;
+}
+
+message IndexStatusRequest {
+  IndexId indexId = 1;
+}
+
 // Service to manage indices.
 service IndexService {
   // Create an index.
-  rpc Create(IndexDefinition) returns (google.protobuf.Empty) {}
+  rpc Create(IndexCreateRequest) returns (google.protobuf.Empty) {}
 
   // Create an index.
   rpc Update(IndexUpdateRequest) returns (google.protobuf.Empty) {}
 
   // Drop an index.
-  rpc Drop(IndexId) returns (google.protobuf.Empty) {}
+  rpc Drop(IndexDropRequest) returns (google.protobuf.Empty) {}
 
   // List available indices.
-  rpc List(google.protobuf.Empty) returns (IndexDefinitionList) {}
+  rpc List(IndexListRequest) returns (IndexDefinitionList) {}
 
   // Get the index definition.
-  rpc Get(IndexId) returns (IndexDefinition) {}
+  rpc Get(IndexGetRequest) returns (IndexDefinition) {}
 
   // Query status of an index.
   // NOTE: API is subject to change.
-  rpc GetStatus(IndexId) returns (IndexStatusResponse) {}
+  rpc GetStatus(IndexStatusRequest) returns (IndexStatusResponse) {}
 
   // Garbage collect vertices identified as invalid before cutoff timestamp.
   rpc GcInvalidVertices(GcInvalidVerticesRequest) returns (google.protobuf.Empty) {}

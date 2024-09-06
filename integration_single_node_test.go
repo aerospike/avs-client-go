@@ -397,6 +397,8 @@ func (suite *SingleNodeTestSuite) TestVectorSearchBool() {
 				return
 			}
 
+			defer suite.AvsClient.IndexDrop(ctx, tc.namespace, indexName)
+
 			for idx, vec := range tc.vectors {
 				recordData := map[string]any{
 					"vector": vec,
