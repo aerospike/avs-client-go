@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,7 +62,7 @@ func TestSingleNodeSuite(t *testing.T) {
 	suites := []*SingleNodeTestSuite{
 		{
 			ServerTestBaseSuite: ServerTestBaseSuite{
-				ComposeFile: "docker/multi-node/docker-compose.yml", // vanilla
+				ComposeFile: "docker/vanilla/docker-compose.yml", // vanilla
 				AvsLB:       false,
 				AvsHostPort: avsHostPort,
 			},
@@ -89,7 +92,30 @@ func TestSingleNodeSuite(t *testing.T) {
 		},
 	}
 
-	for _, s := range suites {
+	testSuiteEnv := os.Getenv("ASVEC_TEST_SUITES")
+	picked_suites := map[int]struct{}{}
+
+	if testSuiteEnv != "" {
+		testSuites := strings.Split(testSuiteEnv, ",")
+
+		for _, s := range testSuites {
+			i, err := strconv.Atoi(s)
+			if err != nil {
+				t.Fatalf("unable to convert %s to int: %v", s, err)
+			}
+
+			picked_suites[i] = struct{}{}
+		}
+	}
+
+	logger.Info("Running test suites", slog.Any("suites", picked_suites))
+
+	for i, s := range suites {
+		if len(picked_suites) != 0 {
+			if _, ok := picked_suites[i]; !ok {
+				continue
+			}
+		}
 		suite.Run(t, s)
 	}
 }
@@ -232,6 +258,13 @@ func getUniqueSetName() *string {
 	setNameCount++
 	val := "set" + fmt.Sprintf("%d", setNameCount)
 	return &val
+}
+
+var userNameCount = -1
+
+func getUniqueUserName() string {
+	userNameCount++
+	return "user" + fmt.Sprintf("%d", userNameCount)
 }
 
 func createNeighborFloat32(namespace string, set *string, key string, distance float32, vector []float32) *Neighbor {
@@ -424,6 +457,277 @@ func (suite *SingleNodeTestSuite) TestVectorSearchBool() {
 
 			suite.Equal(tc.expectedNeighbors, neighbors)
 
+		})
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestConcurrentWrites() {
+	wg := sync.WaitGroup{}
+	numWrites := 10_000
+	keys := []string{}
+
+	for i := 0; i < numWrites; i++ {
+		keys = append(keys, fmt.Sprintf("concurrent-key-%d", i))
+	}
+
+	for i := 0; i < numWrites; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			suite.AvsClient.Upsert(context.Background(), testNamespace, nil, keys[i], map[string]any{"foo": "bar"}, false)
+		}(i)
+	}
+
+	wg.Wait()
+
+	wg = sync.WaitGroup{}
+
+	for i := 0; i < numWrites; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := suite.AvsClient.Get(context.Background(), testNamespace, nil, keys[i], nil, nil)
+			suite.Assert().NoError(err)
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+func (suite *SingleNodeTestSuite) TestUserCreate() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	username := getUniqueUserName()
+
+	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
+	suite.NoError(err)
+
+	actualUser, err := suite.AvsClient.GetUser(ctx, username)
+	suite.NoError(err)
+
+	expectedUser := protos.User{
+		Username: username,
+		Roles: []string{
+			"read-write",
+		},
+	}
+
+	suite.EqualExportedValues(expectedUser, *actualUser)
+	return
+
+}
+
+func (suite *SingleNodeTestSuite) TestUserDelete() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	username := getUniqueUserName()
+
+	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
+	suite.NoError(err)
+
+	err = suite.AvsClient.DropUser(ctx, username)
+	suite.NoError(err)
+
+	_, err = suite.AvsClient.GetUser(ctx, username)
+	suite.Error(err)
+}
+
+func (suite *SingleNodeTestSuite) TestUserGrantRoles() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	username := getUniqueUserName()
+
+	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
+	suite.NoError(err)
+
+	err = suite.AvsClient.GrantRoles(ctx, username, []string{"admin"})
+	suite.NoError(err)
+
+	actualUser, err := suite.AvsClient.GetUser(ctx, username)
+	suite.NoError(err)
+
+	expectedUser := protos.User{
+		Username: username,
+		Roles: []string{
+			"admin",
+			"read-write",
+		},
+	}
+
+	suite.EqualExportedValues(expectedUser, *actualUser)
+}
+
+func (suite *SingleNodeTestSuite) TestUserRevokeRoles() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	username := getUniqueUserName()
+
+	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write", "admin"})
+	suite.NoError(err)
+
+	err = suite.AvsClient.RevokeRoles(ctx, username, []string{"admin"})
+	suite.NoError(err)
+
+	actualUser, err := suite.AvsClient.GetUser(ctx, username)
+	suite.NoError(err)
+
+	expectedUser := protos.User{
+		Username: username,
+		Roles: []string{
+			"read-write",
+		},
+	}
+
+	suite.EqualExportedValues(expectedUser, *actualUser)
+}
+
+func (suite *SingleNodeTestSuite) TestListUsers() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	username := getUniqueUserName()
+
+	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
+	suite.NoError(err)
+
+	username1 := getUniqueUserName()
+
+	err = suite.AvsClient.CreateUser(ctx, username1, "test-password", []string{"read-write"})
+	suite.NoError(err)
+
+	users, err := suite.AvsClient.ListUsers(ctx)
+	suite.NoError(err)
+
+	suite.Equal(3, len(users.Users))
+
+	for _, user := range users.Users {
+		if user.Username == username {
+			suite.Equal([]string{"read-write"}, user.Roles)
+		} else if user.Username == username1 {
+			suite.Equal([]string{"read-write"}, user.Roles)
+		} else {
+			suite.Equal("admin", user.Username)
+			suite.Equal([]string{"admin", "read-write"}, user.Roles)
+		}
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestListRoles() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	roles, err := suite.AvsClient.ListRoles(ctx)
+	suite.NoError(err)
+
+	suite.Equal(2, len(roles.Roles))
+}
+
+func (suite *SingleNodeTestSuite) TestNodeIDs() {
+	ctx := context.Background()
+	nodeIDs := suite.AvsClient.NodeIDs(ctx)
+
+	if suite.AvsLB {
+		suite.Equal(0, len(nodeIDs))
+	} else {
+		suite.Equal(1, len(nodeIDs))
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestClusterEndpoints() {
+	testCases := []struct {
+		name              string
+		nodeId            *protos.NodeId
+		listenerName      *string
+		expectedEndpoints []*protos.ServerEndpoint
+		expectedErrMsg    *string
+	}{
+		{
+			name:   "nil-node",
+			nodeId: nil,
+			expectedEndpoints: []*protos.ServerEndpoint{
+				{
+					Address: "127.0.0.1",
+					Port:    10000,
+					IsTls:   suite.AvsTLSConfig != nil,
+				},
+			},
+		},
+		{
+			name: "node id DNE",
+			nodeId: &protos.NodeId{
+				Id: 1,
+			},
+			expectedErrMsg: GetStrPtr("failed to get cluster endpoints"),
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			endpoints, err := suite.AvsClient.ClusterEndpoints(ctx, tc.nodeId, tc.listenerName)
+
+			if tc.expectedErrMsg != nil {
+				suite.Error(err)
+				suite.Contains(err.Error(), *tc.expectedErrMsg)
+				return
+			} else {
+				suite.NoError(err)
+			}
+
+			for id, endpoint := range endpoints.Endpoints {
+				// When LB is true we aren't able to validate the node-id since
+				// we did not tend the cluster. When LB is false we are able to
+				// get the node-id of the single node.
+				if !suite.AvsLB {
+					nodeId := suite.AvsClient.NodeIDs(ctx)[0]
+					suite.Assert().Equal(nodeId.Id, id)
+				}
+
+				suite.EqualExportedValues(tc.expectedEndpoints[0], endpoint.Endpoints[0])
+			}
+		})
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestAbout() {
+	testCases := []struct {
+		name            string
+		nodeId          *protos.NodeId
+		expectedVersion string
+		expectedErrMsg  *string
+	}{
+		{
+			name:            "nil-node",
+			nodeId:          nil,
+			expectedVersion: "0.10.0",
+		},
+		{
+			name: "node id DNE",
+			nodeId: &protos.NodeId{
+				Id: 1,
+			},
+			expectedErrMsg: GetStrPtr("failed to make about request"),
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			actualVersion, err := suite.AvsClient.About(ctx, tc.nodeId)
+
+			if tc.expectedErrMsg != nil {
+				suite.Error(err)
+				suite.Contains(err.Error(), *tc.expectedErrMsg)
+				return
+			} else {
+				suite.NoError(err)
+			}
+
+			suite.Equal(actualVersion.GetVersion(), tc.expectedVersion)
 		})
 	}
 }

@@ -74,7 +74,7 @@ func createIndexStatusRequest(namespace, name string) *protos.IndexStatusRequest
 	}
 }
 
-var minimumSupportedAVSVersion = newVersion("0.9.0")
+var minimumFullySupportedAVSVersion = newVersion("0.10.0")
 
 type version []any
 

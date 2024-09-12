@@ -365,7 +365,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 					return
 				}
 
-				if newVersion(about.Version).lt(minimumSupportedAVSVersion) {
+				if newVersion(about.Version).lt(minimumFullySupportedAVSVersion) {
 					logger.WarnContext(ctx, "incompatible server version", slog.String("version", about.Version))
 				}
 			}

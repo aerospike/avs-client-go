@@ -16,6 +16,7 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/goleak"
 	"golang.org/x/net/context"
 )
 
@@ -67,6 +68,8 @@ func (suite *ServerTestBaseSuite) TearDownSuite() {
 	if err != nil {
 		fmt.Println("unable to stop docker compose down")
 	}
+
+	goleak.VerifyNone(suite.T())
 }
 
 func GetStrPtr(str string) *string {

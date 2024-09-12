@@ -1364,6 +1364,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 }
 
 // NodeIDs returns a list of all the node IDs that the client is connected to.
+// If load-balancer is set true no NodeIDs will be returned.
 // If a node is accessible but not a part of the cluster it will not be
 // returned.
 //
@@ -1529,7 +1530,7 @@ func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.Abou
 		msg := "failed to make about request"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
-		return nil, NewAVSErrorFromGrpc(msg, err)
+		return nil, NewAVSError(msg, err)
 	}
 
 	resp, err := conn.aboutClient.Get(ctx, &protos.AboutRequest{})
