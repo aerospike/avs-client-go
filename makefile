@@ -38,7 +38,7 @@ unit:
 coverage: test
 	go tool covdata textfmt -i="$(COV_INTEGRATION_DIR),$(COV_UNIT_DIR)" -o=$(COVERAGE_DIR)/tmp.cov
 	go tool cover -func=$(COVERAGE_DIR)/tmp.cov
-	grep -v 'testutils.go' $(COVERAGE_DIR)/tmp.cov > $(COVERAGE_DIR)/total.cov
+	grep -Ev '(testutils\.go|.*\.pb\.go)' $(COVERAGE_DIR)/tmp.cov > $(COVERAGE_DIR)/total.cov
 	
 
 PHONY: view-coverage
