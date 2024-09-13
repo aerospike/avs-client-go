@@ -63,7 +63,7 @@ func TestSingleNodeSuite(t *testing.T) {
 		{
 			ServerTestBaseSuite: ServerTestBaseSuite{
 				ComposeFile: "docker/vanilla/docker-compose.yml", // vanilla
-				AvsLB:       false,
+				AvsLB:       true,
 				AvsHostPort: avsHostPort,
 			},
 		},
@@ -136,7 +136,7 @@ func (suite *SingleNodeTestSuite) TestBasicUpsertGetDelete() {
 		{
 			"test",
 			getUniqueSetName(),
-			"key1",
+			getUniqueKey(),
 			map[string]any{
 				"str":   "str",
 				"int":   int64(64),
@@ -182,6 +182,259 @@ func (suite *SingleNodeTestSuite) TestBasicUpsertGetDelete() {
 		suite.Error(err)
 	}
 }
+
+func (suite *SingleNodeTestSuite) TestBasicUpsertExistsDelete() {
+	records := []struct {
+		namespace  string
+		set        *string
+		key        any
+		recordData map[string]any
+	}{
+		{
+			"test",
+			getUniqueSetName(),
+			getUniqueKey(),
+			map[string]any{
+				"str":   "str",
+				"int":   int64(64),
+				"float": 3.14,
+				"bool":  false,
+				"arr":   []any{int64(0), int64(1), int64(2), int64(3)},
+				"map": map[any]any{
+					"foo": "bar",
+				},
+			},
+		},
+	}
+
+	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// defer cancel()
+	ctx := context.Background()
+
+	for _, rec := range records {
+		err := suite.AvsClient.Upsert(ctx, rec.namespace, rec.set, rec.key, rec.recordData, false)
+		suite.NoError(err)
+
+		if err != nil {
+			return
+		}
+
+		exists, err := suite.AvsClient.Exists(ctx, rec.namespace, rec.set, rec.key)
+		suite.NoError(err)
+
+		if err != nil {
+			return
+		}
+
+		suite.True(exists)
+
+		err = suite.AvsClient.Delete(ctx, rec.namespace, rec.set, rec.key)
+		suite.NoError(err)
+
+		if err != nil {
+			return
+		}
+
+		exists, err = suite.AvsClient.Exists(ctx, rec.namespace, rec.set, rec.key)
+		suite.NoError(err)
+
+		suite.False(exists)
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestIndexCreate() {
+	testcases := []struct {
+		name                 string
+		namespace            string
+		indexName            string
+		vectorField          string
+		dimension            uint32
+		vectorDistanceMetric protos.VectorDistanceMetric
+		opts                 *IndexCreateOpts
+		expectedIndex        protos.IndexDefinition
+	}{
+		{
+			"basic",
+			"test",
+			"index",
+			"vector",
+			10,
+			protos.VectorDistanceMetric_SQUARED_EUCLIDEAN,
+			nil,
+			protos.IndexDefinition{
+				Id: &protos.IndexId{
+					Namespace: "test",
+					Name:      "index",
+				},
+				Dimensions:           uint32(10),
+				VectorDistanceMetric: protos.VectorDistanceMetric_SQUARED_EUCLIDEAN,
+				Type:                 protos.IndexType_HNSW,
+				SetFilter:            nil,
+				Field:                "vector",
+			},
+		},
+		{
+			"with opts",
+			"test",
+			"index",
+			"vector",
+			10,
+			protos.VectorDistanceMetric_COSINE,
+			&IndexCreateOpts{
+				Sets: []string{"testset"},
+				Storage: &protos.IndexStorage{
+					Namespace: GetStrPtr("storage-ns"),
+					Set:       GetStrPtr("storage-set"),
+				},
+				Labels: map[string]string{
+					"a": "b",
+				},
+			},
+			protos.IndexDefinition{
+				Id: &protos.IndexId{
+					Namespace: "test",
+					Name:      "index",
+				},
+				Dimensions:           uint32(10),
+				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
+				Type:                 protos.IndexType_HNSW,
+				SetFilter:            GetStrPtr("testset"),
+				Field:                "vector",
+				Storage: &protos.IndexStorage{
+					Namespace: GetStrPtr("storage-ns"),
+					Set:       GetStrPtr("storage-set"),
+				},
+				Labels: map[string]string{
+					"a": "b",
+				},
+				Params: &protos.IndexDefinition_HnswParams{
+					HnswParams: &protos.HnswParams{},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := suite.AvsClient.IndexCreate(ctx, tc.namespace, tc.indexName, tc.vectorField, tc.dimension, tc.vectorDistanceMetric, tc.opts)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			defer suite.AvsClient.IndexDrop(ctx, tc.namespace, tc.indexName)
+
+			index, err := suite.AvsClient.IndexGet(ctx, tc.namespace, tc.indexName, false)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			suite.EqualExportedValues(tc.expectedIndex, *index)
+		})
+	}
+}
+
+// func (suite *SingleNodeTestSuite) TestIsIndexed() {
+// 	records := []struct {
+// 		namespace  string
+// 		set        *string
+// 		key        any
+// 		recordData map[string]any
+// 	}{
+// 		{
+// 			namespace: "test",
+// 			set:       getUniqueSetName(),
+// 			key:       getUniqueKey(),
+// 			recordData: map[string]any{
+// 				// "str":   "str",
+// 				// "int":   int64(64),
+// 				// "float": 3.14,
+// 				// "bool":  false,
+// 				"arr": getVectorFloat32(10, 1.0),
+// 				// "map": map[any]any{
+// 				// 	"foo": "bar",
+// 				// },
+// 			},
+// 		},
+// 	}
+
+// 	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// 	// defer cancel()
+// 	ctx := context.Background()
+
+// 	for _, rec := range records {
+// 		err := suite.AvsClient.Upsert(ctx, rec.namespace, rec.set, rec.key, rec.recordData, false)
+// 		suite.NoError(err)
+
+// 		for i := 0; i < 10; i++ {
+// 			recordData := map[string]any{
+// 				// "str":   "str",
+// 				// "int":   int64(64),
+// 				// "float": 3.14,
+// 				// "bool":  false,
+// 				"arr": getVectorFloat32(10, float32(i*2)),
+// 				// "map": map[any]any{
+// 				// 	"foo": "bar",
+// 				// },
+// 			}
+
+// 			suite.AvsClient.Upsert(ctx, rec.namespace, rec.set, getUniqueKey(), recordData, false)
+// 		}
+
+// 		if err != nil {
+// 			return
+// 		}
+
+// 		isIndexed, err := suite.AvsClient.IsIndexed(ctx, rec.namespace, rec.set, "index", rec.key)
+// 		suite.Error(err)
+
+// 		var indexOpts *IndexCreateOpts
+
+// 		if rec.set != nil {
+// 			indexOpts = &IndexCreateOpts{
+// 				Sets: []string{*rec.set},
+// 			}
+// 		}
+
+// 		err = suite.AvsClient.IndexCreate(
+// 			ctx,
+// 			rec.namespace,
+// 			"index",
+// 			"arr",
+// 			10,
+// 			protos.VectorDistanceMetric_SQUARED_EUCLIDEAN,
+// 			indexOpts,
+// 		)
+// 		suite.NoError(err)
+
+// 		if err != nil {
+// 			return
+// 		}
+
+// 		isIndexed, err = suite.AvsClient.IsIndexed(ctx, rec.namespace, rec.set, "index", rec.key)
+// 		suite.NoError(err)
+// 		suite.False(isIndexed)
+
+// 		defer suite.AvsClient.IndexDrop(ctx, rec.namespace, "index")
+
+// 		suite.AvsClient.WaitForIndexCompletion(ctx, rec.namespace, "index", time.Second*12)
+
+// 		isIndexed, err = suite.AvsClient.IsIndexed(ctx, rec.namespace, rec.set, "index", rec.key)
+// 		suite.NoError(err)
+
+// 		// time.Sleep(time.Second * 33330)
+
+// 		suite.True(isIndexed)
+
+// 		err = suite.AvsClient.Delete(ctx, rec.namespace, rec.set, rec.key)
+// 		suite.NoError(err)
+// 	}
+// }
 
 func (suite *SingleNodeTestSuite) TestFailsToInsertAlreadyExists() {
 	ctx := context.Background()
@@ -366,6 +619,10 @@ func (suite *SingleNodeTestSuite) TestVectorSearchFloat32() {
 			if err != nil {
 				return
 			}
+
+			isIndexed, err := suite.AvsClient.IsIndexed(ctx, tc.namespace, setName, indexName, getKey(0))
+			suite.NoError(err)
+			suite.True(isIndexed)
 
 			time.Sleep(time.Second * 10)
 

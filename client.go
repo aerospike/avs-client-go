@@ -26,7 +26,7 @@ const (
 	failedToGetRecord         = "failed to get record"
 	failedToDeleteRecord      = "failed to delete record"
 	failedToCheckRecordExists = "failed to check if record exists"
-	failedToCheckIsIndexed    = "failed to check if record exists"
+	failedToCheckIsIndexed    = "failed to check if record is indexed"
 )
 
 // Client is a client for managing Aerospike Vector Indexes.
@@ -422,6 +422,10 @@ func (c *Client) IsIndexed(
 	}
 
 	isIndexedReq := &protos.IsIndexedRequest{
+		IndexId: &protos.IndexId{
+			Namespace: namespace,
+			Name:      indexName,
+		},
 		Key: protoKey,
 	}
 
