@@ -1048,7 +1048,7 @@ func (suite *SingleNodeTestSuite) TestUserUpdateCredentials() {
 	err = suite.AvsClient.UpdateCredentials(ctx, username, "new-password")
 	suite.NoError(err)
 
-	_, err = NewClient(
+	c, err := NewClient(
 		ctx,
 		HostPortSlice{suite.AvsHostPort},
 		nil,
@@ -1059,6 +1059,7 @@ func (suite *SingleNodeTestSuite) TestUserUpdateCredentials() {
 	)
 	suite.NoError(err)
 
+	c.Close()
 }
 
 func (suite *SingleNodeTestSuite) TestUserGrantRoles() {
