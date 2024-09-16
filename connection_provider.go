@@ -1,4 +1,4 @@
-// Package avs provides a channel provider for connecting to Aerospike servers.
+// Package avs provides a connection provider for connecting to Aerospike servers.
 package avs
 
 import (
@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-var errChannelProviderClosed = errors.New("channel provider is closed")
+var errConnectionProviderClosed = errors.New("connection provider is closed")
 
 // connection represents a gRPC client connection and all the clients (stubs)
 // for the various AVS services. It's main purpose to remove the need to create
@@ -50,27 +50,27 @@ func newConnection(conn *grpc.ClientConn) *connection {
 	}
 }
 
-// channelAndEndpoints represents a combination of a gRPC client connection and server endpoints.
-type channelAndEndpoints struct {
+// connectionAndEndpoints represents a combination of a gRPC client connection and server endpoints.
+type connectionAndEndpoints struct {
 	conn      *connection
 	endpoints *protos.ServerEndpointList
 }
 
-// newConnAndEndpoints creates a new channelAndEndpoints instance.
-func newConnAndEndpoints(channel *connection, endpoints *protos.ServerEndpointList) *channelAndEndpoints {
-	return &channelAndEndpoints{
-		conn:      channel,
+// newConnAndEndpoints creates a new connectionAndEndpoints instance.
+func newConnAndEndpoints(conn *connection, endpoints *protos.ServerEndpointList) *connectionAndEndpoints {
+	return &connectionAndEndpoints{
+		conn:      conn,
 		endpoints: endpoints,
 	}
 }
 
-// channelProvider is responsible for managing gRPC client connections to
+// connectionProvider is responsible for managing gRPC client connections to
 // Aerospike servers.
 //
 //nolint:govet // We will favor readability over field alignment
-type channelProvider struct {
+type connectionProvider struct {
 	logger         *slog.Logger
-	nodeConns      map[uint64]*channelAndEndpoints
+	nodeConns      map[uint64]*connectionAndEndpoints
 	seedConns      []*connection
 	tlsConfig      *tls.Config
 	seeds          HostPortSlice
@@ -84,8 +84,8 @@ type channelProvider struct {
 	closed         atomic.Bool
 }
 
-// newChannelProvider creates a new channelProvider instance.
-func newChannelProvider(
+// newConnectionProvider creates a new connectionProvider instance.
+func newConnectionProvider(
 	ctx context.Context,
 	seeds HostPortSlice,
 	listenerName *string,
@@ -93,7 +93,7 @@ func newChannelProvider(
 	credentials *UserPassCredentials,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
-) (*channelProvider, error) {
+) (*connectionProvider, error) {
 	// Initialize the logger.
 	logger = logger.WithGroup("cp")
 
@@ -119,9 +119,9 @@ func newChannelProvider(
 		}
 	}
 
-	// Create the channelProvider instance.
-	cp := &channelProvider{
-		nodeConns:      make(map[uint64]*channelAndEndpoints),
+	// Create the connectionProvider instance.
+	cp := &connectionProvider{
+		nodeConns:      make(map[uint64]*connectionAndEndpoints),
 		seeds:          seeds,
 		listenerName:   listenerName,
 		isLoadBalancer: isLoadBalancer,
@@ -148,7 +148,7 @@ func newChannelProvider(
 
 	// Start the tend routine if load balancing is disabled.
 	if !isLoadBalancer {
-		cp.updateClusterChannels(ctx) // We want at least one tend to occur before we return
+		cp.updateClusterConns(ctx) // We want at least one tend to occur before we return
 
 		cp.logger.Debug("starting tend routine")
 		go cp.tend(context.Background()) // Might add a tend specific timeout in the future?
@@ -159,8 +159,8 @@ func newChannelProvider(
 	return cp, nil
 }
 
-// Close closes the channelProvider and releases all resources.
-func (cp *channelProvider) Close() error {
+// Close closes the connectionProvider and releases all resources.
+func (cp *connectionProvider) Close() error {
 	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
 		<-cp.stopTendChan
@@ -172,16 +172,16 @@ func (cp *channelProvider) Close() error {
 		cp.token.Close()
 	}
 
-	for _, channel := range cp.seedConns {
-		err := channel.grpcConn.Close()
+	for _, conn := range cp.seedConns {
+		err := conn.grpcConn.Close()
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
 			}
 
-			cp.logger.Error("failed to close seed channel",
+			cp.logger.Error("failed to close seed connection",
 				slog.Any("error", err),
-				slog.String("seed", channel.grpcConn.Target()),
+				slog.String("seed", conn.grpcConn.Target()),
 			)
 		}
 	}
@@ -193,7 +193,7 @@ func (cp *channelProvider) Close() error {
 				firstErr = err
 			}
 
-			cp.logger.Error("failed to close node channel",
+			cp.logger.Error("failed to close node connection",
 				slog.Any("error", err),
 				slog.String("node", conn.conn.grpcConn.Target()),
 			)
@@ -207,14 +207,14 @@ func (cp *channelProvider) Close() error {
 }
 
 // GetSeedConn returns a gRPC client connection to a seed node.
-func (cp *channelProvider) GetSeedConn() (*connection, error) {
+func (cp *connectionProvider) GetSeedConn() (*connection, error) {
 	if cp.closed.Load() {
-		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
-		return nil, errChannelProviderClosed
+		cp.logger.Warn("ConnectionProvider is closed, cannot get connection")
+		return nil, errConnectionProviderClosed
 	}
 
 	if len(cp.seedConns) == 0 {
-		msg := "no seed channels found"
+		msg := "no seed connections found"
 		cp.logger.Warn(msg)
 
 		return nil, errors.New(msg)
@@ -227,69 +227,69 @@ func (cp *channelProvider) GetSeedConn() (*connection, error) {
 
 // GetRandomConn returns a gRPC client connection to an Aerospike server. If
 // isLoadBalancer is enabled, it will return the seed connection.
-func (cp *channelProvider) GetRandomConn() (*connection, error) {
+func (cp *connectionProvider) GetRandomConn() (*connection, error) {
 	if cp.closed.Load() {
-		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
-		return nil, errors.New("ChannelProvider is closed")
+		cp.logger.Warn("ConnectionProvider is closed, cannot get connection")
+		return nil, errors.New("ConnectionProvider is closed")
 	}
 
 	if cp.isLoadBalancer {
-		cp.logger.Debug("load balancer is enabled, using seed channel")
+		cp.logger.Debug("load balancer is enabled, using seed connection")
 		return cp.GetSeedConn()
 	}
 
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	discoverdChannels := make([]*channelAndEndpoints, len(cp.nodeConns))
+	discoverdConns := make([]*connectionAndEndpoints, len(cp.nodeConns))
 
 	i := 0
 
-	for _, channel := range cp.nodeConns {
-		discoverdChannels[i] = channel
+	for _, conn := range cp.nodeConns {
+		discoverdConns[i] = conn
 		i++
 	}
 
-	if len(discoverdChannels) == 0 {
-		cp.logger.Warn("no node channels found, using seed channel")
+	if len(discoverdConns) == 0 {
+		cp.logger.Warn("no node connections found, using seed connection")
 		return cp.GetSeedConn()
 	}
 
-	idx := rand.Intn(len(discoverdChannels)) //nolint:gosec // Security is not an issue here
+	idx := rand.Intn(len(discoverdConns)) //nolint:gosec // Security is not an issue here
 
-	return discoverdChannels[idx].conn, nil
+	return discoverdConns[idx].conn, nil
 }
 
 // GetNodeConn returns a gRPC client connection to a specific node. If the node
 // ID cannot be found an error is returned.
-func (cp *channelProvider) GetNodeConn(nodeID uint64) (*connection, error) {
+func (cp *connectionProvider) GetNodeConn(nodeID uint64) (*connection, error) {
 	if cp.closed.Load() {
-		cp.logger.Warn("ChannelProvider is closed, cannot get channel")
-		return nil, errors.New("ChannelProvider is closed")
+		cp.logger.Warn("ConnectionProvider is closed, cannot get connection")
+		return nil, errors.New("ConnectionProvider is closed")
 	}
 
 	if cp.isLoadBalancer {
-		cp.logger.Error("load balancer is enabled, using seed channel")
-		return nil, errors.New("load balancer is enabled, cannot get specific node channel")
+		cp.logger.Error("load balancer is enabled, using seed connection")
+		return nil, errors.New("load balancer is enabled, cannot get specific node connection")
 	}
 
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	channel, ok := cp.nodeConns[nodeID]
+	conn, ok := cp.nodeConns[nodeID]
 	if !ok {
-		msg := "channel not found for specified node id"
+		msg := "connection not found for specified node id"
 		cp.logger.Error(msg, slog.Uint64("node", nodeID))
 
 		return nil, errors.New(msg)
 	}
 
-	return channel.conn, nil
+	return conn.conn, nil
 }
 
 // GetNodeIDs returns the node IDs of all nodes discovered during cluster
 // tending. If tending is disabled (LB true) then no node IDs are returned.
-func (cp *channelProvider) GetNodeIDs() []uint64 {
+func (cp *connectionProvider) GetNodeIDs() []uint64 {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
@@ -303,9 +303,9 @@ func (cp *channelProvider) GetNodeIDs() []uint64 {
 }
 
 // connectToSeeds connects to the seed nodes and creates gRPC client connections.
-func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
+func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) != 0 {
-		msg := "seed channels already exist, close them first"
+		msg := "seed connections already exist, close them first"
 		cp.logger.Error(msg)
 
 		return errors.New(msg)
@@ -329,7 +329,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 
 			grpcConn, err := cp.createGrcpConn(seed)
 			if err != nil {
-				logger.ErrorContext(ctx, "failed to create channel", slog.Any("error", err))
+				logger.ErrorContext(ctx, "failed to create connection", slog.Any("error", err))
 				return
 			}
 
@@ -401,7 +401,7 @@ func (cp *channelProvider) connectToSeeds(ctx context.Context) error {
 }
 
 // updateNodeConns updates the gRPC client connection for a specific node.
-func (cp *channelProvider) updateNodeConns(
+func (cp *connectionProvider) updateNodeConns(
 	ctx context.Context,
 	node uint64,
 	endpoints *protos.ServerEndpointList,
@@ -424,7 +424,7 @@ func (cp *channelProvider) updateNodeConns(
 }
 
 // checkAndSetClusterID checks if the cluster ID has changed and updates it if necessary.
-func (cp *channelProvider) checkAndSetClusterID(clusterID uint64) bool {
+func (cp *connectionProvider) checkAndSetClusterID(clusterID uint64) bool {
 	if clusterID != cp.clusterID {
 		cp.clusterID = clusterID
 		return true
@@ -434,28 +434,28 @@ func (cp *channelProvider) checkAndSetClusterID(clusterID uint64) bool {
 }
 
 // getTendConns returns all the gRPC client connections for tend operations.
-func (cp *channelProvider) getTendConns() []*grpc.ClientConn {
+func (cp *connectionProvider) getTendConns() []*grpc.ClientConn {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	channels := make([]*grpc.ClientConn, len(cp.seedConns)+len(cp.nodeConns))
+	conns := make([]*grpc.ClientConn, len(cp.seedConns)+len(cp.nodeConns))
 	i := 0
 
-	for _, channel := range cp.seedConns {
-		channels[i] = channel.grpcConn
+	for _, conn := range cp.seedConns {
+		conns[i] = conn.grpcConn
 		i++
 	}
 
-	for _, channel := range cp.nodeConns {
-		channels[i] = channel.conn.grpcConn
+	for _, conn := range cp.nodeConns {
+		conns[i] = conn.conn.grpcConn
 		i++
 	}
 
-	return channels
+	return conns
 }
 
 // getUpdatedEndpoints retrieves the updated server endpoints from the Aerospike cluster.
-func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
+func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
 	conns := cp.getTendConns()
 	endpointsChan := make(chan map[uint64]*protos.ServerEndpointList)
 	endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
@@ -478,7 +478,7 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 			if !cp.checkAndSetClusterID(clusterID.GetId()) {
 				logger.DebugContext(
 					ctx,
-					"old cluster ID found, skipping channel discovery",
+					"old cluster ID found, skipping connection discovery",
 					slog.Uint64("clusterID", clusterID.GetId()),
 				)
 
@@ -515,12 +515,12 @@ func (cp *channelProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*
 }
 
 // Checks if the node connections need to be updated and updates them if necessary.
-func (cp *channelProvider) checkAndSetNodeConns(
+func (cp *connectionProvider) checkAndSetNodeConns(
 	ctx context.Context,
 	newNodeEndpoints map[uint64]*protos.ServerEndpointList,
 ) {
 	wg := sync.WaitGroup{}
-	// Find which nodes have a different endpoint list and update their channel
+	// Find which nodes have a different endpoint list and update their connection
 	for node, newEndpoints := range newNodeEndpoints {
 		wg.Add(1)
 
@@ -535,27 +535,27 @@ func (cp *channelProvider) checkAndSetNodeConns(
 
 			if ok {
 				if !endpointListEqual(currEndpoints.endpoints, newEndpoints) {
-					logger.Debug("endpoints for node changed, recreating channel")
+					logger.Debug("endpoints for node changed, recreating connection")
 
 					err := currEndpoints.conn.grpcConn.Close()
 					if err != nil {
-						logger.Warn("failed to close channel", slog.Any("error", err))
+						logger.Warn("failed to close connection", slog.Any("error", err))
 					}
 
 					// Either this is a new node or its endpoints have changed
 					err = cp.updateNodeConns(ctx, node, newEndpoints)
 					if err != nil {
-						logger.Error("failed to create new channel", slog.Any("error", err))
+						logger.Error("failed to create new connection", slog.Any("error", err))
 					}
 				} else {
 					cp.logger.Debug("endpoints for node unchanged")
 				}
 			} else {
-				logger.Debug("new node found, creating new channel")
+				logger.Debug("new node found, creating new connection")
 
 				err := cp.updateNodeConns(ctx, node, newEndpoints)
 				if err != nil {
-					logger.Error("failed to create new channel", slog.Any("error", err))
+					logger.Error("failed to create new connection", slog.Any("error", err))
 				}
 			}
 		}(node, newEndpoints)
@@ -566,16 +566,16 @@ func (cp *channelProvider) checkAndSetNodeConns(
 
 // removeDownNodes removes the gRPC client connections for nodes in nodeConns
 // that aren't apart of newNodeEndpoints
-func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
+func (cp *connectionProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	cp.nodeConnsLock.Lock()
 	defer cp.nodeConnsLock.Unlock()
 
-	// The cluster state changed. Remove old channels.
-	for node, channelEndpoints := range cp.nodeConns {
+	// The cluster state changed. Remove old connections.
+	for node, connEndpoints := range cp.nodeConns {
 		if _, ok := newNodeEndpoints[node]; !ok {
-			err := channelEndpoints.conn.grpcConn.Close()
+			err := connEndpoints.conn.grpcConn.Close()
 			if err != nil {
-				cp.logger.Warn("failed to close channel", slog.Uint64("node", node), slog.Any("error", err))
+				cp.logger.Warn("failed to close connection", slog.Uint64("node", node), slog.Any("error", err))
 			}
 
 			delete(cp.nodeConns, node)
@@ -583,23 +583,23 @@ func (cp *channelProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.S
 	}
 }
 
-// updateClusterChannels updates the gRPC client connections for the Aerospike
+// updateClusterConns updates the gRPC client connections for the Aerospike
 // cluster if the cluster state has changed.
-func (cp *channelProvider) updateClusterChannels(ctx context.Context) {
+func (cp *connectionProvider) updateClusterConns(ctx context.Context) {
 	updatedEndpoints := cp.getUpdatedEndpoints(ctx)
 	if updatedEndpoints == nil {
-		cp.logger.Debug("no new cluster ID found, cluster state is unchanged, skipping channel discovery")
+		cp.logger.Debug("no new cluster ID found, cluster state is unchanged, skipping connection discovery")
 		return
 	}
 
-	cp.logger.Debug("new cluster id found, updating channels")
+	cp.logger.Debug("new cluster id found, updating connections")
 
 	cp.checkAndSetNodeConns(ctx, updatedEndpoints)
 	cp.removeDownNodes(updatedEndpoints)
 }
 
-// tend starts a thread to periodically update the cluster channels.
-func (cp *channelProvider) tend(ctx context.Context) {
+// tend starts a thread to periodically update the cluster connections.
+func (cp *connectionProvider) tend(ctx context.Context) {
 	timer := time.NewTimer(cp.tendInterval)
 	defer timer.Stop()
 
@@ -612,7 +612,7 @@ func (cp *channelProvider) tend(ctx context.Context) {
 
 			ctx, cancel := context.WithTimeout(ctx, cp.tendInterval) // TODO: make configurable?
 
-			cp.updateClusterChannels(ctx)
+			cp.updateClusterConns(ctx)
 
 			if err := ctx.Err(); err != nil {
 				cp.logger.Warn("tend context cancelled", slog.Any("error", err))
@@ -673,7 +673,7 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 
 // createGrpcConnFromEndpoints creates a gRPC client connection from the first
 // successful endpoint in endpoints.
-func (cp *channelProvider) createGrpcConnFromEndpoints(
+func (cp *connectionProvider) createGrpcConnFromEndpoints(
 	endpoints *protos.ServerEndpointList,
 ) (*grpc.ClientConn, error) {
 	for _, endpoint := range endpoints.Endpoints {
@@ -693,7 +693,7 @@ func (cp *channelProvider) createGrpcConnFromEndpoints(
 
 // createGrcpConn creates a gRPC client connection to a host. This handles adding
 // credential and configuring tls.
-func (cp *channelProvider) createGrcpConn(hostPort *HostPort) (*grpc.ClientConn, error) {
+func (cp *connectionProvider) createGrcpConn(hostPort *HostPort) (*grpc.ClientConn, error) {
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {
@@ -724,7 +724,7 @@ func (cp *channelProvider) createGrcpConn(hostPort *HostPort) (*grpc.ClientConn,
 	return conn, nil
 }
 
-func (cp *channelProvider) createConnFromEndpoints(endpoints *protos.ServerEndpointList) (*connection, error) {
+func (cp *connectionProvider) createConnFromEndpoints(endpoints *protos.ServerEndpointList) (*connection, error) {
 	conn, err := cp.createGrpcConnFromEndpoints(endpoints)
 	if err != nil {
 		return nil, err
