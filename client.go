@@ -1456,7 +1456,7 @@ func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*p
 
 	conn, err := c.getConnection(nodeID)
 	if err != nil {
-		msg := "failed to list roles"
+		msg := "failed to get clustering state"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSError(msg, err)

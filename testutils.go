@@ -82,6 +82,16 @@ func GetUint32Ptr(i int) *uint32 {
 	return &ptr
 }
 
+func GetUint64Ptr(i int) *uint64 {
+	ptr := uint64(i)
+	return &ptr
+}
+
+func GetFloat32Ptr(i float32) *float32 {
+	ptr := float32(i)
+	return &ptr
+}
+
 func GetBoolPtr(b bool) *bool {
 	ptr := b
 	return &ptr

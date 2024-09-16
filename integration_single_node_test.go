@@ -63,7 +63,7 @@ func TestSingleNodeSuite(t *testing.T) {
 		{
 			ServerTestBaseSuite: ServerTestBaseSuite{
 				ComposeFile: "docker/vanilla/docker-compose.yml", // vanilla
-				AvsLB:       true,
+				AvsLB:       false,
 				AvsHostPort: avsHostPort,
 			},
 		},
@@ -339,6 +339,185 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 	}
 }
 
+func (suite *SingleNodeTestSuite) TestIndexUpdate() {
+	testcases := []struct {
+		name                 string
+		namespace            string
+		indexName            string
+		vectorField          string
+		dimension            uint32
+		vectorDistanceMetric protos.VectorDistanceMetric
+		opts                 *IndexCreateOpts
+		updateLabels         map[string]string
+		updateHnsw           *protos.HnswIndexUpdate
+		expectedIndex        protos.IndexDefinition
+	}{
+		{
+			name:                 "no update",
+			namespace:            "test",
+			indexName:            "index",
+			vectorField:          "vector",
+			dimension:            10,
+			vectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
+			opts: &IndexCreateOpts{
+				Sets: []string{"testset"},
+				Storage: &protos.IndexStorage{
+					Namespace: GetStrPtr("storage-ns"),
+					Set:       GetStrPtr("storage-set"),
+				},
+				Labels: map[string]string{
+					"a": "b",
+				},
+			},
+			updateHnsw:   nil,
+			updateLabels: nil,
+			expectedIndex: protos.IndexDefinition{
+				Id: &protos.IndexId{
+					Namespace: "test",
+					Name:      "index",
+				},
+				Dimensions:           uint32(10),
+				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
+				Type:                 protos.IndexType_HNSW,
+				SetFilter:            GetStrPtr("testset"),
+				Field:                "vector",
+				Storage: &protos.IndexStorage{
+					Namespace: GetStrPtr("storage-ns"),
+					Set:       GetStrPtr("storage-set"),
+				},
+				Labels: map[string]string{
+					"a": "b",
+				},
+				Params: &protos.IndexDefinition_HnswParams{
+					HnswParams: &protos.HnswParams{},
+				},
+			},
+		},
+		{
+			name:                 "update all params",
+			namespace:            "test",
+			indexName:            "index",
+			vectorField:          "vector",
+			dimension:            10,
+			vectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
+			opts: &IndexCreateOpts{
+				Sets: []string{"testset"},
+				Storage: &protos.IndexStorage{
+					Namespace: GetStrPtr("storage-ns"),
+					Set:       GetStrPtr("storage-set"),
+				},
+				Labels: map[string]string{
+					"a": "b",
+				},
+			},
+			updateHnsw: &protos.HnswIndexUpdate{
+				MaxMemQueueSize: GetUint32Ptr(100),
+				BatchingParams: &protos.HnswBatchingParams{
+					MaxRecords: GetUint32Ptr(10_001),
+					Interval:   GetUint32Ptr(10_002),
+				},
+				CachingParams: &protos.HnswCachingParams{
+					MaxEntries: GetUint64Ptr(10_003),
+					Expiry:     GetUint64Ptr(10_004),
+				},
+				HealerParams: &protos.HnswHealerParams{
+					MaxScanRatePerNode: GetUint32Ptr(10_005),
+					MaxScanPageSize:    GetUint32Ptr(10_006),
+					ReindexPercent:     GetFloat32Ptr(51),
+					Schedule:           GetStrPtr("0 0 0 25 12 ?"),
+					Parallelism:        GetUint32Ptr(1),
+				},
+				MergeParams: &protos.HnswIndexMergeParams{
+					IndexParallelism:   GetUint32Ptr(2),
+					ReIndexParallelism: GetUint32Ptr(3),
+				},
+			},
+			updateLabels: map[string]string{
+				"c": "d",
+			},
+			expectedIndex: protos.IndexDefinition{
+				Id: &protos.IndexId{
+					Namespace: "test",
+					Name:      "index",
+				},
+				Dimensions:           uint32(10),
+				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
+				Type:                 protos.IndexType_HNSW,
+				SetFilter:            GetStrPtr("testset"),
+				Field:                "vector",
+				Storage: &protos.IndexStorage{
+					Namespace: GetStrPtr("storage-ns"),
+					Set:       GetStrPtr("storage-set"),
+				},
+				Labels: map[string]string{
+					"a": "b",
+					"c": "d",
+				},
+				Params: &protos.IndexDefinition_HnswParams{
+					HnswParams: &protos.HnswParams{
+						MaxMemQueueSize: GetUint32Ptr(100),
+						BatchingParams: &protos.HnswBatchingParams{
+							MaxRecords: GetUint32Ptr(10_001),
+							Interval:   GetUint32Ptr(10_002),
+						},
+						CachingParams: &protos.HnswCachingParams{
+							MaxEntries: GetUint64Ptr(10_003),
+							Expiry:     GetUint64Ptr(10_004),
+						},
+						HealerParams: &protos.HnswHealerParams{
+							MaxScanRatePerNode: GetUint32Ptr(10_005),
+							MaxScanPageSize:    GetUint32Ptr(10_006),
+							ReindexPercent:     GetFloat32Ptr(51),
+							Schedule:           GetStrPtr("0 0 0 25 12 ?"),
+							Parallelism:        GetUint32Ptr(1),
+						},
+						MergeParams: &protos.HnswIndexMergeParams{
+							IndexParallelism:   GetUint32Ptr(2),
+							ReIndexParallelism: GetUint32Ptr(3),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := suite.AvsClient.IndexCreate(ctx, tc.namespace, tc.indexName, tc.vectorField, tc.dimension, tc.vectorDistanceMetric, tc.opts)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			defer suite.AvsClient.IndexDrop(ctx, tc.namespace, tc.indexName)
+
+			index, err := suite.AvsClient.IndexGet(ctx, tc.namespace, tc.indexName, false)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			err = suite.AvsClient.IndexUpdate(ctx, tc.namespace, tc.indexName, tc.updateLabels, tc.updateHnsw)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			time.Sleep(time.Second * 3)
+
+			index, err = suite.AvsClient.IndexGet(ctx, tc.namespace, tc.indexName, false)
+			suite.NoError(err)
+
+			suite.EqualExportedValues(tc.expectedIndex, *index)
+		})
+	}
+}
+
 // func (suite *SingleNodeTestSuite) TestIsIndexed() {
 // 	records := []struct {
 // 		namespace  string
@@ -435,6 +614,72 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 // 		suite.NoError(err)
 // 	}
 // }
+
+func (suite *SingleNodeTestSuite) TestIndexGetStatus() {
+	testcases := []struct {
+		name                 string
+		namespace            string
+		indexName            string
+		vectorField          string
+		dimension            uint32
+		vectorDistanceMetric protos.VectorDistanceMetric
+		opts                 *IndexCreateOpts
+		expectedStatus       protos.IndexStatusResponse
+	}{
+		{
+			name:                 "basic",
+			namespace:            "test",
+			indexName:            "index",
+			vectorField:          "vector",
+			dimension:            10,
+			vectorDistanceMetric: protos.VectorDistanceMetric_SQUARED_EUCLIDEAN,
+			opts:                 nil,
+			expectedStatus:       protos.IndexStatusResponse{UnmergedRecordCount: 0},
+		},
+	}
+
+	for _, tc := range testcases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			err := suite.AvsClient.IndexCreate(ctx, tc.namespace, tc.indexName, tc.vectorField, tc.dimension, tc.vectorDistanceMetric, tc.opts)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			defer suite.AvsClient.IndexDrop(ctx, tc.namespace, tc.indexName)
+
+			status, err := suite.AvsClient.IndexGetStatus(ctx, tc.namespace, tc.indexName)
+			suite.NoError(err)
+
+			if err != nil {
+				return
+			}
+
+			suite.EqualExportedValues(tc.expectedStatus, *status)
+		})
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestIndexGCInvalidVertices() {
+	ctx := context.Background()
+	namespace := "test"
+	indexName := "index"
+	vectorField := "vector"
+	dimension := uint32(10)
+	vectorDistanceMetric := protos.VectorDistanceMetric_SQUARED_EUCLIDEAN
+	opts := &IndexCreateOpts{}
+
+	err := suite.AvsClient.IndexCreate(ctx, namespace, indexName, vectorField, dimension, vectorDistanceMetric, opts)
+	suite.NoError(err)
+
+	defer suite.AvsClient.IndexDrop(ctx, namespace, indexName)
+
+	err = suite.AvsClient.GcInvalidVertices(ctx, namespace, indexName, time.Now())
+	suite.NoError(err)
+}
 
 func (suite *SingleNodeTestSuite) TestFailsToInsertAlreadyExists() {
 	ctx := context.Background()
@@ -791,6 +1036,31 @@ func (suite *SingleNodeTestSuite) TestUserDelete() {
 	suite.Error(err)
 }
 
+func (suite *SingleNodeTestSuite) TestUserUpdateCredentials() {
+	suite.SkipIfUserPassAuthDisabled()
+
+	ctx := context.Background()
+	username := getUniqueUserName()
+
+	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
+	suite.NoError(err)
+
+	err = suite.AvsClient.UpdateCredentials(ctx, username, "new-password")
+	suite.NoError(err)
+
+	_, err = NewClient(
+		ctx,
+		HostPortSlice{suite.AvsHostPort},
+		nil,
+		suite.AvsLB,
+		NewCredentialsFromUserPass(username, "new-password"),
+		suite.AvsTLSConfig,
+		suite.Logger,
+	)
+	suite.NoError(err)
+
+}
+
 func (suite *SingleNodeTestSuite) TestUserGrantRoles() {
 	suite.SkipIfUserPassAuthDisabled()
 
@@ -891,6 +1161,91 @@ func (suite *SingleNodeTestSuite) TestNodeIDs() {
 		suite.Equal(0, len(nodeIDs))
 	} else {
 		suite.Equal(1, len(nodeIDs))
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestConnectedNodeEndpoint() {
+	testCases := []struct {
+		name              string
+		nodeId            *protos.NodeId
+		listenerName      *string
+		expectedEndpoints *protos.ServerEndpoint
+		expectedErrMsg    *string
+	}{
+		{
+			name:   "nil-node",
+			nodeId: nil,
+			expectedEndpoints: &protos.ServerEndpoint{
+				Address: "localhost",
+				Port:    10000,
+				IsTls:   false,
+			},
+		},
+		{
+			name: "node id DNE",
+			nodeId: &protos.NodeId{
+				Id: 1,
+			},
+			expectedErrMsg: GetStrPtr("failed to get connected endpoint"),
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			endpoint, err := suite.AvsClient.ConnectedNodeEndpoint(ctx, tc.nodeId)
+
+			if tc.expectedErrMsg != nil {
+				suite.Error(err)
+				suite.Contains(err.Error(), *tc.expectedErrMsg)
+				return
+			} else {
+				suite.NoError(err)
+			}
+
+			suite.EqualExportedValues(tc.expectedEndpoints, endpoint)
+		})
+	}
+}
+
+func (suite *SingleNodeTestSuite) TestClusteringState() {
+	testCases := []struct {
+		name           string
+		nodeId         *protos.NodeId
+		listenerName   *string
+		expectedErrMsg *string
+	}{
+		{
+			name:   "nil-node",
+			nodeId: nil,
+		},
+		{
+			name: "node id DNE",
+			nodeId: &protos.NodeId{
+				Id: 1,
+			},
+			expectedErrMsg: GetStrPtr("failed to get clustering state"),
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.T().Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			state, err := suite.AvsClient.ClusteringState(ctx, tc.nodeId)
+
+			if tc.expectedErrMsg != nil {
+				suite.Error(err)
+				suite.Contains(err.Error(), *tc.expectedErrMsg)
+				return
+			} else {
+				suite.NoError(err)
+			}
+
+			// Simple test. Ideally we will have a better check in the future.
+			// Does not test cluster-id
+			suite.True(state.IsInCluster)
+			suite.Len(state.Members, 1)
+		})
 	}
 }
 
