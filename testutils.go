@@ -93,8 +93,11 @@ func GetFloat32Ptr(i float32) *float32 {
 }
 
 func GetBoolPtr(b bool) *bool {
-	ptr := b
-	return &ptr
+	return &b
+}
+
+func GetTimePtr(t time.Time) *time.Time {
+	return &t
 }
 
 func CreateFlagStr(name, value string) string {

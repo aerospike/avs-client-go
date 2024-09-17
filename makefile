@@ -35,6 +35,7 @@ mocks: get-mockgen
 	$(MOCKGEN) --source protos/auth_grpc.pb.go --destination protos/auth_grpc_mock.pb.go --package protos
 	$(MOCKGEN) --source protos/index_grpc.pb.go --destination protos/index_grpc_mock.pb.go --package protos
 	$(MOCKGEN) --source protos/transact_grpc.pb.go --destination protos/transact_grpc_mock.pb.go --package protos
+	$(MOCKGEN) --source protos/types.pb.go --destination protos/types_mock.pb.go --package protos
 	$(MOCKGEN) --source protos/user-admin_grpc.pb.go --destination protos/user-admin_grpc_mock.pb.go --package protos
 	$(MOCKGEN) --source protos/vector-db_grpc.pb.go --destination protos/vector-db_grpc_mock.pb.go --package protos
 

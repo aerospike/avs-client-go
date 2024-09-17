@@ -3,6 +3,7 @@ package avs
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -835,4 +836,515 @@ func TestExists_FailsDeleteRequest(t *testing.T) {
 	var avsError *Error
 	assert.ErrorAs(t, err, &avsError)
 	assert.Equal(t, avsError, NewAVSError(failedToCheckRecordExists, fmt.Errorf("foo")))
+}
+
+func TestIsIndexed_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	// Prepare the expected PutRequest
+	expectedIsIndexedRequest := &protos.IsIndexedRequest{
+		Key: &protos.Key{
+			Namespace: "testNamespace",
+			Set:       nil,
+			Value: &protos.Key_StringValue{
+				StringValue: "testKey",
+			},
+		},
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+	}
+
+	mockTransactClient.
+		EXPECT().
+		IsIndexed(gomock.Any(), gomock.Any()).
+		Return(&protos.Boolean{
+			Value: true,
+		}, nil).
+		Do(func(ctx context.Context, in *protos.IsIndexedRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedIsIndexedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	var set *string = nil
+	key := "testKey"
+	indexName := "testIndex"
+
+	exists, err := client.IsIndexed(ctx, namespace, set, indexName, key)
+
+	assert.NoError(t, err)
+	assert.True(t, exists)
+}
+
+func TestIsIndexed_FailsGettingConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(nil, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	var set *string = nil
+	key := "testKey"
+	indexName := "testIndex"
+
+	_, err = client.IsIndexed(ctx, namespace, set, indexName, key)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError(failedToCheckIsIndexed, fmt.Errorf("foo")))
+}
+
+func TestIsIndexed_FailsConvertingKey(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	var set *string = nil
+	key := struct{}{}
+	indexName := "testIndex"
+
+	_, err = client.IsIndexed(ctx, namespace, set, indexName, key)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError(failedToCheckIsIndexed, fmt.Errorf("unsupported key type: struct {}")))
+}
+
+func TestIsIndexed_FailsDeleteRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+
+	mockTransactClient.
+		EXPECT().
+		IsIndexed(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("foo"))
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	var set *string = nil
+	key := "key"
+	indexName := "testIndex"
+
+	_, err = client.IsIndexed(ctx, namespace, set, indexName, key)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError(failedToCheckIsIndexed, fmt.Errorf("foo")))
+}
+
+func TestVectorSearchFloat32_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+	mockVectorSearchClient := protos.NewMockTransactService_VectorSearchClient(ctrl)
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	// Prepare the expected PutRequest
+	expectedVectorSearchFloat32Request := &protos.VectorSearchRequest{
+		Index: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+		QueryVector: &protos.Vector{
+			Data: &protos.Vector_FloatData{
+				FloatData: &protos.FloatData{
+					Value: []float32{1.0, 2.0, 3.0},
+				},
+			},
+		},
+		Limit: 7,
+		SearchParams: &protos.VectorSearchRequest_HnswSearchParams{
+			HnswSearchParams: &protos.HnswSearchParams{
+				Ef: GetUint32Ptr(8),
+			},
+		},
+		Projection: &protos.ProjectionSpec{
+			Include: &protos.ProjectionFilter{
+				Type: protos.ProjectionType_ALL,
+			},
+			Exclude: &protos.ProjectionFilter{
+				Type: protos.ProjectionType_NONE,
+			},
+		},
+	}
+
+	mockTransactClient.
+		EXPECT().
+		VectorSearch(gomock.Any(), gomock.Any()).
+		Return(mockVectorSearchClient, nil).
+		Do(func(ctx context.Context, in *protos.VectorSearchRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedVectorSearchFloat32Request, in)
+		})
+
+	vectorCounter := 0
+	mockVectorSearchClient.
+		EXPECT().
+		Recv().
+		AnyTimes().
+		DoAndReturn(
+			func() (*protos.Neighbor, error) {
+				vectorCounter++
+
+				if vectorCounter == 4 {
+					return nil, io.EOF
+				}
+
+				return &protos.Neighbor{
+					Key: &protos.Key{
+						Namespace: "testNamespace",
+						Set:       GetStrPtr("testSet"),
+						Value: &protos.Key_StringValue{
+							StringValue: fmt.Sprintf("key-%d", vectorCounter),
+						},
+					},
+					Record: &protos.Record{
+						Fields: []*protos.Field{
+							{
+								Name: "field1",
+								Value: &protos.Value{
+									Value: &protos.Value_StringValue{
+										StringValue: "value1",
+									},
+								},
+							},
+						},
+						Metadata: &protos.Record_AerospikeMetadata{
+							AerospikeMetadata: &protos.AerospikeRecordMetadata{
+								Generation: uint32(vectorCounter),
+								Expiration: uint32(vectorCounter),
+							},
+						},
+					},
+					Distance: float32(vectorCounter),
+				}, nil
+			},
+		)
+
+	expectedNeighbors := []*Neighbor{
+		{
+			Record: &Record{
+				Data: map[string]any{
+					"field1": "value1",
+				},
+				Generation: uint32(1),
+				Expiration: GetTimePtr(AerospikeEpoch.Add(time.Second * 1)),
+			},
+			Set:       GetStrPtr("testSet"),
+			Key:       "key-1",
+			Namespace: "testNamespace",
+			Distance:  float32(1),
+		},
+		{
+			Record: &Record{
+				Data: map[string]any{
+					"field1": "value1",
+				},
+				Generation: uint32(2),
+				Expiration: GetTimePtr(AerospikeEpoch.Add(time.Second * 2)),
+			},
+			Set:       GetStrPtr("testSet"),
+			Key:       "key-2",
+			Namespace: "testNamespace",
+			Distance:  float32(2),
+		},
+		{
+			Record: &Record{
+				Data: map[string]any{
+					"field1": "value1",
+				},
+				Generation: uint32(3),
+				Expiration: GetTimePtr(AerospikeEpoch.Add(time.Second * 3)),
+			},
+			Set:       GetStrPtr("testSet"),
+			Key:       "key-3",
+			Namespace: "testNamespace",
+			Distance:  float32(3),
+		},
+	}
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+	vector := []float32{1.0, 2.0, 3.0}
+	limit := uint32(7)
+	searchParams := &protos.HnswSearchParams{
+		Ef: GetUint32Ptr(8),
+	}
+
+	neighbors, err := client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, len(expectedNeighbors), len(neighbors))
+	for i, _ := range neighbors {
+		assert.EqualExportedValues(t, expectedNeighbors[i], neighbors[i])
+	}
+}
+
+func TestVectorSearchFloat32_FailsGettingConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(nil, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+	vector := []float32{1.0, 2.0, 3.0}
+	limit := uint32(7)
+	searchParams := &protos.HnswSearchParams{
+		Ef: GetUint32Ptr(8),
+	}
+
+	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to search for vector", fmt.Errorf("foo")))
+}
+
+func TestVectorSearchFloat32_FailsVectorSearch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockTransactClient.
+		EXPECT().
+		VectorSearch(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+	vector := []float32{1.0, 2.0, 3.0}
+	limit := uint32(7)
+	searchParams := &protos.HnswSearchParams{
+		Ef: GetUint32Ptr(8),
+	}
+
+	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to search for vector", fmt.Errorf("foo")))
+}
+
+func TestVectorSearchFloat32_FailedToRecvAllNeighbors(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+	mockVectorSearchClient := protos.NewMockTransactService_VectorSearchClient(ctrl)
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockTransactClient.
+		EXPECT().
+		VectorSearch(gomock.Any(), gomock.Any()).
+		Return(mockVectorSearchClient, nil)
+
+	mockVectorSearchClient.
+		EXPECT().
+		Recv().
+		AnyTimes().
+		DoAndReturn(
+			func() (*protos.Neighbor, error) {
+				return nil, fmt.Errorf("foo")
+			},
+		)
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+	vector := []float32{1.0, 2.0, 3.0}
+	limit := uint32(7)
+	searchParams := &protos.HnswSearchParams{
+		Ef: GetUint32Ptr(8),
+	}
+
+	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to receive all neighbors", fmt.Errorf("foo")))
+}
+
+type unknowKeyValue struct{}
+
+func (u *unknowKeyValue) isKey_Value() {}
+
+func TestVectorSearchFloat32_FailedToConvertNeighbor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockTransactClient := protos.NewMockTransactServiceClient(ctrl)
+	mockConn := &connection{
+		transactClient: mockTransactClient,
+	}
+	mockVectorSearchClient := protos.NewMockTransactService_VectorSearchClient(ctrl)
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockTransactClient.
+		EXPECT().
+		VectorSearch(gomock.Any(), gomock.Any()).
+		Return(mockVectorSearchClient, nil)
+
+	mockVectorSearchClient.
+		EXPECT().
+		Recv().
+		AnyTimes().
+		DoAndReturn(
+			func() (*protos.Neighbor, error) {
+				return &protos.Neighbor{
+					Key: &protos.Key{Value: protos.NewMockisKey_Value(ctrl)},
+				}, nil
+			},
+		)
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+	vector := []float32{1.0, 2.0, 3.0}
+	limit := uint32(7)
+	searchParams := &protos.HnswSearchParams{
+		Ef: GetUint32Ptr(8),
+	}
+
+	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to convert neighbor", fmt.Errorf("error converting neighbor: unsupported key value type: *protos.MockisKey_Value")))
 }
