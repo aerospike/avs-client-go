@@ -809,7 +809,7 @@ func (c *Client) IndexCreateFromIndexDef(
 
 	_, err = conn.indexClient.Create(ctx, indexCreateReq)
 	if err != nil {
-		msg := "failed to create index"
+		msg := "failed to create index from definition"
 		logger.Error(msg, slog.Any("error", err))
 
 		return NewAVSErrorFromGrpc(msg, err)
@@ -828,7 +828,7 @@ func (c *Client) IndexCreateFromIndexDef(
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
 //	name (string): The name of the index.
-//	metadata (map[string]string): Metadata to update on the index.
+//	labels (map[string]string): Labels to update on the index.
 //	hnswParams (*protos.HnswIndexUpdate): The HNSW parameters to update.
 //
 // Returns:
@@ -838,7 +838,7 @@ func (c *Client) IndexUpdate(
 	ctx context.Context,
 	namespace string,
 	indexName string,
-	metadata map[string]string,
+	labels map[string]string,
 	hnswParams *protos.HnswIndexUpdate,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
@@ -858,7 +858,7 @@ func (c *Client) IndexUpdate(
 			Namespace: namespace,
 			Name:      indexName,
 		},
-		Labels: metadata,
+		Labels: labels,
 		Update: &protos.IndexUpdateRequest_HnswIndexUpdate{
 			HnswIndexUpdate: hnswParams,
 		},

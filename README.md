@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/aerospike/avs-client-go/graph/badge.svg?token=811TWWPW6S)](https://codecov.io/gh/aerospike/avs-client-go)
+
 # Aerospike Vector Search Go Client
 
 > :warning: The go client is currently in development. APIs will break in the future!
