@@ -29,10 +29,18 @@ const (
 	failedToCheckIsIndexed    = "failed to check if record is indexed"
 )
 
+type connProvider interface {
+	GetNodeIDs() []uint64
+	GetRandomConn() (*connection, error)
+	GetSeedConn() (*connection, error)
+	GetNodeConn(id uint64) (*connection, error)
+	Close() error
+}
+
 // Client is a client for managing Aerospike Vector Indexes.
 type Client struct {
 	logger             *slog.Logger
-	connectionProvider *connectionProvider
+	connectionProvider connProvider
 }
 
 // NewClient creates a new Client instance.
@@ -78,6 +86,13 @@ func NewClient(
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
 	}
 
+	return newClient(connectionProvider, logger)
+}
+
+func newClient(
+	connectionProvider connProvider,
+	logger *slog.Logger,
+) (*Client, error) {
 	return &Client{
 		logger:             logger,
 		connectionProvider: connectionProvider,
@@ -314,8 +329,8 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		logger.Error(failedToInsertRecord, slog.Any("error", err))
-		return NewAVSError(failedToInsertRecord, err)
+		logger.Error(failedToDeleteRecord, slog.Any("error", err))
+		return NewAVSError(failedToDeleteRecord, err)
 	}
 
 	getReq := &protos.DeleteRequest{
@@ -325,7 +340,7 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 	_, err = conn.transactClient.Delete(ctx, getReq)
 	if err != nil {
 		logger.Error(failedToDeleteRecord, slog.Any("error", err))
-		return NewAVSErrorFromGrpc(failedToGetRecord, err)
+		return NewAVSErrorFromGrpc(failedToDeleteRecord, err)
 	}
 
 	return nil

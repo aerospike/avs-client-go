@@ -4,7 +4,11 @@ go 1.21
 
 require (
 	github.com/aerospike/tools-common-go v0.0.0-20240701164814-36eec593d9c6
+	github.com/golang/mock v1.6.0
 	github.com/stretchr/testify v1.9.0
+	go.uber.org/goleak v1.3.0
+	go.uber.org/mock v0.4.0
+	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f
 	golang.org/x/net v0.27.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -16,7 +20,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	go.uber.org/goleak v1.3.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
