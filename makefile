@@ -40,7 +40,7 @@ mocks: get-mockgen
 
 
 .PHONY: test
-test: integration unit
+test: unit integration 
 
 .PHONY: integration
 integration: $(GOLEAK)
