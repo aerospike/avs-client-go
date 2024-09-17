@@ -10,6 +10,8 @@ import (
 
 	"github.com/aerospike/avs-client-go/protos"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/stretchr/testify/assert"
@@ -1828,4 +1830,240 @@ func TestIndexUpdate_FailUpdateCall(t *testing.T) {
 	var avsError *Error
 	assert.ErrorAs(t, err, &avsError)
 	assert.Equal(t, avsError, NewAVSError("failed to update index", fmt.Errorf("bar")))
+}
+
+func TestIndexDrop_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Times(2).
+		Return(mockConn, nil)
+
+	expectedIndexDropRequest := &protos.IndexDropRequest{
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+	}
+
+	mockIndexClient.
+		EXPECT().
+		Drop(gomock.Any(), gomock.Any()).
+		Return(nil, nil).
+		Do(func(ctx context.Context, in *protos.IndexDropRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedIndexDropRequest, in)
+		})
+
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Return(nil, status.Errorf(codes.NotFound, "foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	err = client.IndexDrop(ctx, testNamespace, testIndex)
+
+	assert.NoError(t, err)
+}
+
+func TestIndexDrop_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	err = client.IndexDrop(ctx, testNamespace, testIndex)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to drop index", fmt.Errorf("foo")))
+}
+
+func TestIndexDrop_FailDropCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		Drop(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	err = client.IndexDrop(ctx, testNamespace, testIndex)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to drop index", fmt.Errorf("bar")))
+}
+
+func TestIndexList_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedIndexListRequest := &protos.IndexListRequest{
+		ApplyDefaults: GetBoolPtr(true),
+	}
+
+	expectedIndexDefs := &protos.IndexDefinitionList{
+		Indices: []*protos.IndexDefinition{
+			{
+				Id: &protos.IndexId{
+					Namespace: "testNamespace0",
+					Name:      "testIndex0",
+				},
+			},
+			{
+				Id: &protos.IndexId{
+					Namespace: "testNamespace1",
+					Name:      "testIndex1",
+				},
+			},
+		},
+	}
+
+	mockIndexClient.
+		EXPECT().
+		List(gomock.Any(), gomock.Any()).
+		Return(expectedIndexDefs, nil).
+		Do(func(ctx context.Context, in *protos.IndexListRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedIndexListRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	indexDefs, err := client.IndexList(ctx, true)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedIndexDefs, indexDefs)
+}
+
+func TestIndexList_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	_, err = client.IndexList(ctx, true)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get indexes", fmt.Errorf("foo")))
+}
+
+func TestIndexList_FailDropCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		List(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.IndexList(ctx, true)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get indexes", fmt.Errorf("bar")))
 }
