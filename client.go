@@ -640,8 +640,10 @@ func (c *Client) WaitForIndexCompletion(
 
 	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to wait for index completion", slog.Any("error", err))
-		return err
+		msg := "failed to wait for index completion"
+		logger.Error(msg, slog.Any("error", err))
+
+		return NewAVSError(msg, err)
 	}
 
 	indexStatusReq := createIndexStatusRequest(namespace, indexName)
@@ -655,8 +657,10 @@ func (c *Client) WaitForIndexCompletion(
 	for {
 		indexStatus, err := conn.indexClient.GetStatus(ctx, indexStatusReq)
 		if err != nil {
-			logger.ErrorContext(ctx, "failed to wait for index completion", slog.Any("error", err))
-			return err
+			msg := "failed to wait for index completion"
+			logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+			return NewAVSError(msg, err)
 		}
 
 		// We consider the index completed when unmerged record count == 0 for
@@ -674,7 +678,7 @@ func (c *Client) WaitForIndexCompletion(
 		} else {
 			logger.DebugContext(ctx, "index not yet completed", slog.Int64("unmerged", unmerged))
 
-			unmergedNotZeroCount--
+			unmergedNotZeroCount++
 		}
 
 		timer.Reset(waitInterval)
@@ -682,8 +686,9 @@ func (c *Client) WaitForIndexCompletion(
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
+			msg := "failed to wait for index completion"
 			logger.ErrorContext(ctx, "waiting for index completion canceled")
-			return ctx.Err()
+			return NewAVSError(msg, ctx.Err())
 		}
 	}
 }

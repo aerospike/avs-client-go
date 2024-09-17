@@ -1348,3 +1348,219 @@ func TestVectorSearchFloat32_FailedToConvertNeighbor(t *testing.T) {
 	assert.ErrorAs(t, err, &avsError)
 	assert.Equal(t, avsError, NewAVSError("failed to convert neighbor", fmt.Errorf("error converting neighbor: unsupported key value type: *protos.MockisKey_Value")))
 }
+
+func TestWaitForIndexCompletion_SuccessAfterZeroCountReturnedTwice(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedGetStatusRequest := &protos.IndexStatusRequest{
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+	}
+
+	indexStatus := &protos.IndexStatusResponse{
+		UnmergedRecordCount: 0,
+	}
+
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Times(3).
+		Return(indexStatus, nil).
+		Do(func(ctx context.Context, in *protos.IndexStatusRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedGetStatusRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+
+	err = client.WaitForIndexCompletion(ctx, namespace, indexName, time.Millisecond*1)
+
+	assert.NoError(t, err)
+}
+
+func TestWaitForIndexCompletion_SuccessAfterNonZeroUnmergedCount(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedGetStatusRequest := &protos.IndexStatusRequest{
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+	}
+
+	indexStatusCount := 0
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Times(2).
+		DoAndReturn(func(ctx context.Context, in *protos.IndexStatusRequest, opts ...grpc.CallOption) (*protos.IndexStatusResponse, error) {
+			assert.Equal(t, expectedGetStatusRequest, in)
+			indexStatusCount++
+
+			if indexStatusCount == 1 {
+				return &protos.IndexStatusResponse{
+					UnmergedRecordCount: 1,
+				}, nil
+			} else {
+				return &protos.IndexStatusResponse{
+					UnmergedRecordCount: 0,
+				}, nil
+			}
+
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+
+	err = client.WaitForIndexCompletion(ctx, namespace, indexName, time.Millisecond*1)
+
+	assert.NoError(t, err)
+}
+
+func TestWaitForIndexCompletion_FailToGetRandomConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+
+	err = client.WaitForIndexCompletion(ctx, namespace, indexName, time.Millisecond*1)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to wait for index completion", fmt.Errorf("foo")))
+}
+
+func TestWaitForIndexCompletion_FailGetStatusCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	namespace := "testNamespace"
+	indexName := "testIndex"
+
+	err = client.WaitForIndexCompletion(ctx, namespace, indexName, time.Millisecond*1)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to wait for index completion", fmt.Errorf("foo")))
+}
+
+func TestWaitForIndexCompletion_FailTimeout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	// Set up expectations for connProvider.GetRandomConn()
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Return(nil, nil)
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	namespace := "testNamespace"
+	indexName := "testIndex"
+
+	err = client.WaitForIndexCompletion(ctx, namespace, indexName, time.Second*1)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to wait for index completion", fmt.Errorf("context deadline exceeded")))
+}
