@@ -101,6 +101,10 @@ func newConnectionProvider(
 	logger *slog.Logger,
 ) (*connectionProvider, error) {
 	// Initialize the logger.
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	logger = logger.WithGroup("cp")
 
 	// Validate the seeds.

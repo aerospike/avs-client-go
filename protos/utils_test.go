@@ -171,7 +171,7 @@ func TestConvertToValue(t *testing.T) {
 	testCases := []struct {
 		input       any
 		expected    *Value
-		expectedErr error
+		expectedErr bool
 	}{
 		{
 			input: "testString",
@@ -370,9 +370,47 @@ func TestConvertToValue(t *testing.T) {
 			},
 		},
 		{
+			input: []float32{1, 2},
+			expected: &Value{
+				Value: &Value_VectorValue{
+					VectorValue: &Vector{
+						Data: &Vector_FloatData{
+							FloatData: &FloatData{
+								Value: []float32{1, 2},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input: []bool{true, false},
+			expected: &Value{
+				Value: &Value_VectorValue{
+					VectorValue: &Vector{
+						Data: &Vector_BoolData{
+							BoolData: &BoolData{
+								Value: []bool{true, false},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input:       map[int]any{10: struct{}{}},
+			expected:    nil,
+			expectedErr: true,
+		},
+		{
+			input:       []any{struct{}{}},
+			expected:    nil,
+			expectedErr: true,
+		},
+		{
 			input:       struct{}{}, // Unsupported type
 			expected:    nil,
-			expectedErr: fmt.Errorf("unsupported value type: struct {}"),
+			expectedErr: true,
 		},
 	}
 
@@ -381,8 +419,325 @@ func TestConvertToValue(t *testing.T) {
 			result, err := ConvertToValue(tc.input)
 
 			assert.Equal(t, tc.expected, result)
-			assert.Equal(t, tc.expectedErr, err)
+
+			if tc.expectedErr {
+				assert.Error(t, err)
+			}
 		})
+	}
+}
+
+func TestConvertToMapKey(t *testing.T) {
+	testCases := []struct {
+		input       any
+		expected    *MapKey
+		expectedErr error
+	}{
+		{
+			input: "testString",
+			expected: &MapKey{
+				Value: &MapKey_StringValue{
+					StringValue: "testString",
+				},
+			},
+		},
+		{
+			input: int32(123),
+			expected: &MapKey{
+				Value: &MapKey_IntValue{
+					IntValue: 123,
+				},
+			},
+		},
+		{
+			input: int64(123456789),
+			expected: &MapKey{
+				Value: &MapKey_LongValue{
+					LongValue: 123456789,
+				},
+			},
+		},
+		{
+			input: int(123456789),
+			expected: &MapKey{
+				Value: &MapKey_LongValue{
+					LongValue: 123456789,
+				},
+			},
+		},
+		{
+			input: []byte{0x01, 0x02, 0x03},
+			expected: &MapKey{
+				Value: &MapKey_BytesValue{
+					BytesValue: []byte{0x01, 0x02, 0x03},
+				},
+			},
+		},
+		{
+			input:       struct{}{},
+			expected:    nil, // Unsupported type
+			expectedErr: fmt.Errorf("unsupported key type: struct {}"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertToMapKey(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+		assert.Equal(t, tc.expectedErr, err)
+	}
+}
+
+type mapKeyValueUnknown struct{}
+
+func (*mapKeyValueUnknown) isMapKey_Value() {} //nolint:revive,stylecheck // Grpc generated
+
+func TestConvertFromMapKey(t *testing.T) {
+	testCases := []struct {
+		input       *MapKey
+		expected    any
+		expectedErr error
+	}{
+		{
+			input: &MapKey{
+				Value: &MapKey_StringValue{
+					StringValue: "testString",
+				},
+			},
+			expected: "testString",
+		},
+		{
+			input: &MapKey{
+				Value: &MapKey_BytesValue{
+					BytesValue: []byte{0x01, 0x02, 0x03},
+				},
+			},
+			expected: []byte{0x01, 0x02, 0x03},
+		},
+		{
+			input: &MapKey{
+				Value: &MapKey_IntValue{
+					IntValue: 123,
+				},
+			},
+			expected: int32(123),
+		},
+		{
+			input: &MapKey{
+				Value: &MapKey_LongValue{
+					LongValue: 123456789,
+				},
+			},
+			expected: int64(123456789),
+		},
+		{
+			input: &MapKey{
+				Value: &mapKeyValueUnknown{},
+			},
+			expected:    nil,
+			expectedErr: fmt.Errorf("unsupported map key value type: *protos.mapKeyValueUnknown"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertFromMapKey(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+		assert.Equal(t, tc.expectedErr, err)
+	}
+}
+
+func TestConvertToMapValue(t *testing.T) {
+	testCases := []struct {
+		input       any
+		expected    *Map
+		expectedErr *string
+	}{
+		{
+			input: map[any]any{"key": "value"},
+			expected: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_StringValue{
+								StringValue: "key",
+							},
+						},
+						Value: &Value{
+							Value: &Value_StringValue{
+								StringValue: "value",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input: map[string]string{"key": "value"},
+			expected: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_StringValue{
+								StringValue: "key",
+							},
+						},
+						Value: &Value{
+							Value: &Value_StringValue{
+								StringValue: "value",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input: map[int]float64{10: 3.124},
+			expected: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_LongValue{
+								LongValue: int64(10),
+							},
+						},
+						Value: &Value{
+							Value: &Value_DoubleValue{
+								DoubleValue: 3.124,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			input:       map[int]any{10: struct{}{}},
+			expected:    nil,
+			expectedErr: GetStrPtr("unsupported map value: unsupported value type: struct {}"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertToMapValue(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+
+		if tc.expectedErr != nil {
+			assert.ErrorContains(t, err, *tc.expectedErr)
+		}
+	}
+}
+
+func TestConvertFromMapValue(t *testing.T) {
+	var nilMap map[any]any
+	testCases := []struct {
+		input       *Map
+		expected    any
+		expectedErr *string
+	}{
+		{
+			input: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_StringValue{
+								StringValue: "key",
+							},
+						},
+						Value: &Value{
+							Value: &Value_StringValue{
+								StringValue: "value",
+							},
+						},
+					},
+				},
+			},
+			expected: map[any]any{"key": "value"},
+		},
+		{
+			input: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_StringValue{
+								StringValue: "key",
+							},
+						},
+						Value: &Value{
+							Value: &Value_StringValue{
+								StringValue: "value",
+							},
+						},
+					},
+				},
+			},
+			expected: map[any]any{"key": "value"},
+		},
+		{
+			input: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_LongValue{
+								LongValue: int64(10),
+							},
+						},
+						Value: &Value{
+							Value: &Value_DoubleValue{
+								DoubleValue: 3.124,
+							},
+						},
+					},
+				},
+			},
+			expected: map[any]any{int64(10): 3.124},
+		},
+		{
+			input: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &mapKeyValueUnknown{},
+						},
+						Value: &Value{
+							Value: &Value_DoubleValue{
+								DoubleValue: 3.124,
+							},
+						},
+					},
+				},
+			},
+			expected:    nilMap,
+			expectedErr: GetStrPtr("unsupported map key value type: *protos.mapKeyValueUnknown"),
+		},
+		{
+			input: &Map{
+				Entries: []*MapEntry{
+					{
+						Key: &MapKey{
+							Value: &MapKey_LongValue{
+								LongValue: int64(10),
+							},
+						},
+						Value: &Value{
+							Value: &valueUnknown{},
+						},
+					},
+				},
+			},
+			expected:    nilMap,
+			expectedErr: GetStrPtr("unsupported map value: unsupported value type: *protos.valueUnknown"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertFromMapValue(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+
+		if tc.expectedErr != nil {
+			assert.ErrorContains(t, err, *tc.expectedErr)
+		}
 	}
 }
 
@@ -512,5 +867,97 @@ func TestConvertFromValue(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 			assert.Equal(t, tc.expectedErr, err)
 		})
+	}
+}
+
+func TestConvertToFields(t *testing.T) {
+	testCases := []struct {
+		input       map[string]any
+		expected    []*Field
+		expectedErr bool
+	}{
+		{
+			input: map[string]any{
+				"key1": "value1",
+				"key2": 123,
+			},
+			expected: []*Field{
+				{
+					Name:  "key1",
+					Value: &Value{Value: &Value_StringValue{StringValue: "value1"}},
+				},
+				{
+					Name:  "key2",
+					Value: &Value{Value: &Value_LongValue{LongValue: 123}},
+				},
+			},
+		},
+		{
+			input: map[string]any{
+				"key1": "value1",
+				"key2": struct{}{},
+			},
+			expected:    nil,
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertToFields(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+
+		if tc.expectedErr {
+			assert.Error(t, err)
+		}
+	}
+}
+
+func TestConvertFromFields(t *testing.T) {
+	testCases := []struct {
+		input       []*Field
+		expected    map[string]any
+		expectedErr bool
+	}{
+		{
+			input: []*Field{
+				{
+					Name:  "key1",
+					Value: &Value{Value: &Value_StringValue{StringValue: "value1"}},
+				},
+				{
+					Name:  "key2",
+					Value: &Value{Value: &Value_LongValue{LongValue: 123}},
+				},
+			},
+			expected: map[string]any{
+				"key1": "value1",
+				"key2": int64(123),
+			},
+		},
+		{
+			input: []*Field{
+				{
+					Name:  "key1",
+					Value: &Value{Value: &Value_StringValue{StringValue: "value1"}},
+				},
+				{
+					Name:  "key2",
+					Value: &Value{Value: &valueUnknown{}},
+				},
+			},
+			expected:    nil,
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertFromFields(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+
+		if tc.expectedErr {
+			assert.Error(t, err)
+		}
 	}
 }
