@@ -2067,3 +2067,354 @@ func TestIndexList_FailDropCall(t *testing.T) {
 	assert.ErrorAs(t, err, &avsError)
 	assert.Equal(t, avsError, NewAVSError("failed to get indexes", fmt.Errorf("bar")))
 }
+
+func TestIndexGet_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedIndexListRequest := &protos.IndexGetRequest{
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+		ApplyDefaults: GetBoolPtr(true),
+	}
+
+	expectedIndexDefs := &protos.IndexDefinition{
+		Id: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+	}
+
+	mockIndexClient.
+		EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(expectedIndexDefs, nil).
+		Do(func(ctx context.Context, in *protos.IndexGetRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedIndexListRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	indexDefs, err := client.IndexGet(ctx, testNamespace, testIndex, true)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedIndexDefs, indexDefs)
+}
+
+func TestIndexGet_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	_, err = client.IndexGet(ctx, testNamespace, testIndex, true)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get index", fmt.Errorf("foo")))
+}
+
+func TestIndexGet_FailDropCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	_, err = client.IndexGet(ctx, testNamespace, testIndex, true)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get index", fmt.Errorf("bar")))
+}
+
+func TestIndexGetStatus_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedIndexStatusRequest := &protos.IndexStatusRequest{
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+	}
+
+	expectedIndexStatusResp := &protos.IndexStatusResponse{
+		UnmergedRecordCount: 9,
+	}
+
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Return(expectedIndexStatusResp, nil).
+		Do(func(ctx context.Context, in *protos.IndexStatusRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedIndexStatusRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	indexDefs, err := client.IndexGetStatus(ctx, testNamespace, testIndex)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedIndexStatusResp, indexDefs)
+}
+
+func TestIndexGetStatus_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	_, err = client.IndexGetStatus(ctx, testNamespace, testIndex)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get index status", fmt.Errorf("foo")))
+}
+
+func TestIndexGetStatus_FailDropCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		GetStatus(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	_, err = client.IndexGetStatus(ctx, testNamespace, testIndex)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get index status", fmt.Errorf("bar")))
+}
+
+func TestIndexGcInvalidVertices_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	cutoffTime := time.Now()
+	expectedIndexStatusRequest := &protos.GcInvalidVerticesRequest{
+		IndexId: &protos.IndexId{
+			Namespace: "testNamespace",
+			Name:      "testIndex",
+		},
+		CutoffTimestamp: cutoffTime.Unix(),
+	}
+
+	mockIndexClient.
+		EXPECT().
+		GcInvalidVertices(gomock.Any(), gomock.Any()).
+		Return(&emptypb.Empty{}, nil).
+		Do(func(ctx context.Context, in *protos.GcInvalidVerticesRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedIndexStatusRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+
+	err = client.GcInvalidVertices(ctx, testNamespace, testIndex, cutoffTime)
+
+	assert.NoError(t, err)
+}
+
+func TestIndexGcInvalidVertices_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+	cutoffTime := time.Now()
+
+	err = client.GcInvalidVertices(ctx, testNamespace, testIndex, cutoffTime)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to garbage collect invalid vertices", fmt.Errorf("foo")))
+}
+
+func TestIndexGcInvalidVertices_FailDropCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockIndexClient := protos.NewMockIndexServiceClient(ctrl)
+	mockConn := &connection{
+		indexClient: mockIndexClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockIndexClient.
+		EXPECT().
+		GcInvalidVertices(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testNamespace := "testNamespace"
+	testIndex := "testIndex"
+	cutoffTime := time.Now()
+
+	err = client.GcInvalidVertices(ctx, testNamespace, testIndex, cutoffTime)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to garbage collect invalid vertices", fmt.Errorf("bar")))
+}
