@@ -23,12 +23,18 @@ import (
 
 var errConnectionProviderClosed = errors.New("connection provider is closed")
 
+type GrpcClientConn interface {
+	grpc.ClientConnInterface
+	Target() string
+	Close() error
+}
+
 // connection represents a gRPC client connection and all the clients (stubs)
 // for the various AVS services. It's main purpose to remove the need to create
 // multiple clients for the same connection. This follows the documented grpc
 // best practice of reusing connections.
 type connection struct {
-	grpcConn          *grpc.ClientConn
+	grpcConn          GrpcClientConn
 	transactClient    protos.TransactServiceClient
 	authClient        protos.AuthServiceClient
 	userAdminClient   protos.UserAdminServiceClient
@@ -38,7 +44,7 @@ type connection struct {
 }
 
 // newConnection creates a new connection instance.
-func newConnection(conn *grpc.ClientConn) *connection {
+func newConnection(conn GrpcClientConn) *connection {
 	return &connection{
 		grpcConn:          conn,
 		transactClient:    protos.NewTransactServiceClient(conn),
@@ -314,7 +320,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 	var authErr error
 
 	wg := sync.WaitGroup{}
-	seedGrpcConns := make(chan *grpc.ClientConn)
+	seedGrpcConns := make(chan GrpcClientConn)
 	cp.seedConns = []*connection{}
 	tokenLock := sync.Mutex{} // Ensures only one thread attempts to update token at a time
 	tokenUpdated := false     // Ensures token update only occurs once
@@ -434,11 +440,11 @@ func (cp *connectionProvider) checkAndSetClusterID(clusterID uint64) bool {
 }
 
 // getTendConns returns all the gRPC client connections for tend operations.
-func (cp *connectionProvider) getTendConns() []*grpc.ClientConn {
+func (cp *connectionProvider) getTendConns() []GrpcClientConn {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	conns := make([]*grpc.ClientConn, len(cp.seedConns)+len(cp.nodeConns))
+	conns := make([]GrpcClientConn, len(cp.seedConns)+len(cp.nodeConns))
 	i := 0
 
 	for _, conn := range cp.seedConns {
@@ -464,7 +470,7 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 	for _, conn := range conns {
 		wg.Add(1)
 
-		go func(conn *grpc.ClientConn) {
+		go func(conn GrpcClientConn) {
 			defer wg.Done()
 
 			logger := cp.logger.With(slog.String("host", conn.Target()))
@@ -675,7 +681,7 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 // successful endpoint in endpoints.
 func (cp *connectionProvider) createGrpcConnFromEndpoints(
 	endpoints *protos.ServerEndpointList,
-) (*grpc.ClientConn, error) {
+) (GrpcClientConn, error) {
 	for _, endpoint := range endpoints.Endpoints {
 		if strings.ContainsRune(endpoint.Address, ':') {
 			continue // TODO: Add logging and support for IPv6
@@ -693,7 +699,7 @@ func (cp *connectionProvider) createGrpcConnFromEndpoints(
 
 // createGrcpConn creates a gRPC client connection to a host. This handles adding
 // credential and configuring tls.
-func (cp *connectionProvider) createGrcpConn(hostPort *HostPort) (*grpc.ClientConn, error) {
+func (cp *connectionProvider) createGrcpConn(hostPort *HostPort) (GrpcClientConn, error) {
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {

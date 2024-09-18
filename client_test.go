@@ -3094,3 +3094,526 @@ func TestRevokeRoles_FailCall(t *testing.T) {
 	assert.ErrorAs(t, err, &avsError)
 	assert.Equal(t, avsError, NewAVSError("failed to revoke user roles", fmt.Errorf("bar")))
 }
+
+func TestListRoles_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &emptypb.Empty{}
+
+	expectedRoles := &protos.ListRolesResponse{
+		Roles: []*protos.Role{
+			{
+				Id: "testRole",
+			},
+		},
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		ListRoles(gomock.Any(), gomock.Any()).
+		Return(expectedRoles, nil).
+		Do(func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	user, err := client.ListRoles(ctx)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedRoles, user)
+}
+
+func TestListRoles_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ListRoles(ctx)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to list roles", fmt.Errorf("foo")))
+}
+
+func TestListRoles_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		ListRoles(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ListRoles(ctx)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to list roles", fmt.Errorf("bar")))
+}
+
+func TestConnectedNodeEndpoint_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockGrpcConn := NewMockGrpcClientConn(ctrl)
+	mockConn := &connection{
+		grpcConn: mockGrpcConn,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	expectedEndpoint := &protos.ServerEndpoint{
+		Address: "1.1.1.1",
+		Port:    3000,
+	}
+
+	mockGrpcConn.
+		EXPECT().
+		Target().
+		Return("1.1.1.1:3000")
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	endpoint, err := client.ConnectedNodeEndpoint(ctx, nil)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedEndpoint, endpoint)
+}
+
+func TestConnectedNodeEndpoint_FailedGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockGrpcConn := NewMockGrpcClientConn(ctrl)
+	mockConn := &connection{
+		grpcConn: mockGrpcConn,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ConnectedNodeEndpoint(ctx, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get connected endpoint", fmt.Errorf("foo")))
+}
+
+func TestConnectedNodeEndpoint_FailParsePort(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockGrpcConn := NewMockGrpcClientConn(ctrl)
+	mockConn := &connection{
+		grpcConn: mockGrpcConn,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	mockGrpcConn.
+		EXPECT().
+		Target().
+		Return("1.1.1.1:aaaa")
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ConnectedNodeEndpoint(ctx, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Contains(t, avsError.Error(), "failed to parse port")
+}
+
+func TestClusteringState_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockClusterInfoClient := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockConn := &connection{
+		clusterInfoClient: mockClusterInfoClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &emptypb.Empty{}
+
+	expectedRoles := &protos.ClusteringState{
+		IsInCluster: true,
+	}
+
+	mockClusterInfoClient.
+		EXPECT().
+		GetClusteringState(gomock.Any(), gomock.Any()).
+		Return(expectedRoles, nil).
+		Do(func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	user, err := client.ClusteringState(ctx, nil)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedRoles, user)
+}
+
+func TestClusteringState_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockClusterInfoClient := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockConn := &connection{
+		clusterInfoClient: mockClusterInfoClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ClusteringState(ctx, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get clustering state", fmt.Errorf("foo")))
+}
+
+func TestClusteringState_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockClusterInfoClient := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockConn := &connection{
+		clusterInfoClient: mockClusterInfoClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	mockClusterInfoClient.
+		EXPECT().
+		GetClusteringState(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ClusteringState(ctx, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get clustering state", fmt.Errorf("bar")))
+}
+
+func TestClusterEndpoints_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockClusterInfoClient := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockConn := &connection{
+		clusterInfoClient: mockClusterInfoClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	listenerName := "test-listener"
+	expectedRequest := &protos.ClusterNodeEndpointsRequest{
+		ListenerName: &listenerName,
+	}
+
+	expectedResp := &protos.ClusterNodeEndpoints{}
+
+	mockClusterInfoClient.
+		EXPECT().
+		GetClusterEndpoints(gomock.Any(), gomock.Any()).
+		Return(expectedResp, nil).
+		Do(func(ctx context.Context, in *protos.ClusterNodeEndpointsRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	user, err := client.ClusterEndpoints(ctx, nil, &listenerName)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedResp, user)
+}
+
+func TestClusterEndpoints_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockClusterInfoClient := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockConn := &connection{
+		clusterInfoClient: mockClusterInfoClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	listenerName := "test-listener"
+
+	_, err = client.ClusterEndpoints(ctx, nil, &listenerName)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get cluster endpoints", fmt.Errorf("foo")))
+}
+
+func TestClusterEndpoints_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockClusterInfoClient := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockConn := &connection{
+		clusterInfoClient: mockClusterInfoClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	mockClusterInfoClient.
+		EXPECT().
+		GetClusterEndpoints(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	listenerName := "test-listener"
+	_, err = client.ClusterEndpoints(ctx, nil, &listenerName)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get cluster endpoints", fmt.Errorf("bar")))
+}
+
+func TestAbout_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockAboutClient := protos.NewMockAboutServiceClient(ctrl)
+	mockConn := &connection{
+		aboutClient: mockAboutClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &protos.AboutRequest{}
+	expectedResp := &protos.AboutResponse{}
+
+	mockAboutClient.
+		EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(expectedResp, nil).
+		Do(func(ctx context.Context, in *protos.AboutRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	user, err := client.About(ctx, nil)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedResp, user)
+}
+
+func TestAbout_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockAboutClient := protos.NewMockAboutServiceClient(ctrl)
+	mockConn := &connection{
+		aboutClient: mockAboutClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.About(ctx, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to make about request", fmt.Errorf("foo")))
+}
+
+func TestAbout_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockAboutClient := protos.NewMockAboutServiceClient(ctrl)
+	mockConn := &connection{
+		aboutClient: mockAboutClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetSeedConn().
+		Return(mockConn, nil)
+
+	mockAboutClient.
+		EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	_, err = client.About(ctx, nil)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to make about request", fmt.Errorf("bar")))
+}

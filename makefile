@@ -32,6 +32,7 @@ $(MOCKGEN): $(GOBIN)
 .PHONY: mocks
 mocks: get-mockgen
 	$(MOCKGEN) --source client.go --destination client_mock.go --package avs
+	$(MOCKGEN) --source connection_provider.go --destination connection_provider_mock.go --package avs
 	$(MOCKGEN) --source protos/auth_grpc.pb.go --destination protos/auth_grpc_mock.pb.go --package protos
 	$(MOCKGEN) --source protos/index_grpc.pb.go --destination protos/index_grpc_mock.pb.go --package protos
 	$(MOCKGEN) --source protos/transact_grpc.pb.go --destination protos/transact_grpc_mock.pb.go --package protos

@@ -1378,7 +1378,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 
 	rolesResp, err := conn.userAdminClient.ListRoles(ctx, &emptypb.Empty{})
 	if err != nil {
-		msg := "failed to lists roles"
+		msg := "failed to list roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
