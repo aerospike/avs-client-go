@@ -2418,3 +2418,679 @@ func TestIndexGcInvalidVertices_FailDropCall(t *testing.T) {
 	assert.ErrorAs(t, err, &avsError)
 	assert.Equal(t, avsError, NewAVSError("failed to garbage collect invalid vertices", fmt.Errorf("bar")))
 }
+
+func TestCreateUser_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &protos.AddUserRequest{
+		Credentials: &protos.Credentials{
+			Username: "testUser",
+			Credentials: &protos.Credentials_PasswordCredentials{
+				PasswordCredentials: &protos.PasswordCredentials{
+					Password: "testPass",
+				},
+			},
+		},
+		Roles: []string{
+			"testRole",
+		},
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		AddUser(gomock.Any(), gomock.Any()).
+		Return(&emptypb.Empty{}, nil).
+		Do(func(ctx context.Context, in *protos.AddUserRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testPass := "testPass"
+	testRoles := []string{"testRole"}
+
+	err = client.CreateUser(ctx, testUser, testPass, testRoles)
+
+	assert.NoError(t, err)
+}
+
+func TestCreateUser_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testPass := "testPass"
+	testRoles := []string{"testRole"}
+
+	err = client.CreateUser(ctx, testUser, testPass, testRoles)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to create user", fmt.Errorf("foo")))
+}
+
+func TestCreateUser_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		AddUser(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testPass := "testPass"
+	testRoles := []string{"testRole"}
+
+	err = client.CreateUser(ctx, testUser, testPass, testRoles)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to create user", fmt.Errorf("bar")))
+}
+
+func TestUpdateCredentials_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &protos.UpdateCredentialsRequest{
+		Credentials: &protos.Credentials{
+			Username: "testUser",
+			Credentials: &protos.Credentials_PasswordCredentials{
+				PasswordCredentials: &protos.PasswordCredentials{
+					Password: "testPass",
+				},
+			},
+		},
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		UpdateCredentials(gomock.Any(), gomock.Any()).
+		Return(&emptypb.Empty{}, nil).
+		Do(func(ctx context.Context, in *protos.UpdateCredentialsRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testPass := "testPass"
+
+	err = client.UpdateCredentials(ctx, testUser, testPass)
+
+	assert.NoError(t, err)
+}
+
+func TestUpdateCredentials_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testPass := "testPass"
+
+	err = client.UpdateCredentials(ctx, testUser, testPass)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to update user credentials", fmt.Errorf("foo")))
+}
+
+func TestUpdateCredentials_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		UpdateCredentials(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testPass := "testPass"
+
+	err = client.UpdateCredentials(ctx, testUser, testPass)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to update user credentials", fmt.Errorf("bar")))
+}
+
+func TestDropUser_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &protos.DropUserRequest{
+		Username: "testUser",
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		DropUser(gomock.Any(), gomock.Any()).
+		Return(&emptypb.Empty{}, nil).
+		Do(func(ctx context.Context, in *protos.DropUserRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+
+	err = client.DropUser(ctx, testUser)
+
+	assert.NoError(t, err)
+}
+
+func TestDropUser_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+
+	err = client.DropUser(ctx, testUser)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to drop user", fmt.Errorf("foo")))
+}
+
+func TestDropUser_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		DropUser(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+
+	err = client.DropUser(ctx, testUser)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to drop user", fmt.Errorf("bar")))
+}
+
+func TestGetUser_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &protos.GetUserRequest{
+		Username: "testUser",
+	}
+
+	expectedUser := &protos.User{
+		Username: "testUser",
+		Roles: []string{
+			"testRole",
+		},
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		GetUser(gomock.Any(), gomock.Any()).
+		Return(expectedUser, nil).
+		Do(func(ctx context.Context, in *protos.GetUserRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+
+	user, err := client.GetUser(ctx, testUser)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedUser, user)
+}
+
+func TestGetUser_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+
+	_, err = client.GetUser(ctx, testUser)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get user", fmt.Errorf("foo")))
+}
+
+func TestGetUser_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		GetUser(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+
+	_, err = client.GetUser(ctx, testUser)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to get user", fmt.Errorf("bar")))
+}
+
+func TestListUsers_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &emptypb.Empty{}
+
+	expectedUsers := &protos.ListUsersResponse{
+		Users: []*protos.User{
+			{
+
+				Username: "testUser",
+				Roles: []string{
+					"testRole",
+				},
+			},
+		},
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		ListUsers(gomock.Any(), gomock.Any()).
+		Return(expectedUsers, nil).
+		Do(func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	user, err := client.ListUsers(ctx)
+
+	assert.NoError(t, err)
+	assert.EqualExportedValues(t, expectedUsers, user)
+}
+
+func TestListUsers_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ListUsers(ctx)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to list users", fmt.Errorf("foo")))
+}
+
+func TestListUsers_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		ListUsers(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+
+	_, err = client.ListUsers(ctx)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to list users", fmt.Errorf("bar")))
+}
+
+func TestRevokeRoles_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	expectedRequest := &protos.RevokeRolesRequest{
+		Username: "testUser",
+		Roles:    []string{"testRole"},
+	}
+
+	mockUserAdminClient.
+		EXPECT().
+		RevokeRoles(gomock.Any(), gomock.Any()).
+		Return(&emptypb.Empty{}, nil).
+		Do(func(ctx context.Context, in *protos.RevokeRolesRequest, opts ...grpc.CallOption) {
+			assert.Equal(t, expectedRequest, in)
+		})
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testRoles := []string{"testRole"}
+
+	err = client.RevokeRoles(ctx, testUser, testRoles)
+
+	assert.NoError(t, err)
+}
+
+func TestRevokeRoles_FailGetConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserAdminClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserAdminClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, fmt.Errorf("foo"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testRoles := []string{"testRole"}
+
+	err = client.RevokeRoles(ctx, testUser, testRoles)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to revoke user roles", fmt.Errorf("foo")))
+}
+
+func TestRevokeRoles_FailCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockConnProvider := NewMockconnProvider(ctrl)
+	mockUserClient := protos.NewMockUserAdminServiceClient(ctrl)
+	mockConn := &connection{
+		userAdminClient: mockUserClient,
+	}
+
+	mockConnProvider.
+		EXPECT().
+		GetRandomConn().
+		Return(mockConn, nil)
+
+	mockUserClient.
+		EXPECT().
+		RevokeRoles(gomock.Any(), gomock.Any()).
+		Return(nil, fmt.Errorf("bar"))
+
+	// Create the client with the mock connProvider
+	client, err := newClient(mockConnProvider, slog.Default())
+	assert.NoError(t, err)
+
+	// Prepare input parameters
+	ctx := context.Background()
+	testUser := "testUser"
+	testRoles := []string{"testRole"}
+
+	err = client.RevokeRoles(ctx, testUser, testRoles)
+
+	var avsError *Error
+	assert.ErrorAs(t, err, &avsError)
+	assert.Equal(t, avsError, NewAVSError("failed to revoke user roles", fmt.Errorf("bar")))
+}

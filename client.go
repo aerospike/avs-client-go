@@ -1268,7 +1268,7 @@ func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, erro
 
 	usersResp, err := conn.userAdminClient.ListUsers(ctx, &emptypb.Empty{})
 	if err != nil {
-		msg := "failed to lists users"
+		msg := "failed to list users"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
