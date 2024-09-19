@@ -615,10 +615,171 @@ func TestConvertToMapValue(t *testing.T) {
 			expected:    nil,
 			expectedErr: GetStrPtr("unsupported map value: unsupported value type: struct {}"),
 		},
+		{
+			input:       map[any]any{struct{}{}: 10},
+			expected:    nil,
+			expectedErr: GetStrPtr("unsupported map key: unsupported key type: struct {}"),
+		},
 	}
 
 	for _, tc := range testCases {
 		result, err := ConvertToMapValue(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+
+		if tc.expectedErr != nil {
+			assert.ErrorContains(t, err, *tc.expectedErr)
+		}
+	}
+}
+
+func TestConvertToList(t *testing.T) {
+	testCases := []struct {
+		input       []any
+		expected    *List
+		expectedErr *string
+	}{
+		{
+			input: []any{"item1", "item2"},
+			expected: &List{
+				Entries: []*Value{
+					{
+						Value: &Value_StringValue{
+							StringValue: "item1",
+						},
+					},
+					{
+						Value: &Value_StringValue{
+							StringValue: "item2",
+						},
+					},
+				},
+			},
+		},
+		{
+			input: []any{1, 2},
+			expected: &List{
+				Entries: []*Value{
+					{
+						Value: &Value_LongValue{
+							LongValue: int64(1),
+						},
+					},
+					{
+						Value: &Value_LongValue{
+							LongValue: int64(2),
+						},
+					},
+				},
+			},
+		},
+		{
+			input: []any{true, false},
+			expected: &List{
+				Entries: []*Value{
+					{
+						Value: &Value_BooleanValue{
+							BooleanValue: true,
+						},
+					},
+					{
+						Value: &Value_BooleanValue{
+							BooleanValue: false,
+						},
+					},
+				},
+			},
+		},
+		{
+			input:       []any{struct{}{}},
+			expected:    nil,
+			expectedErr: GetStrPtr("unsupported list value: unsupported value type: struct {}"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertToList(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+
+		if tc.expectedErr != nil {
+			assert.ErrorContains(t, err, *tc.expectedErr)
+		}
+	}
+}
+
+func TestConvertFromListValue(t *testing.T) {
+	testCases := []struct {
+		input       *List
+		expected    []any
+		expectedErr *string
+	}{
+		{
+			input: &List{
+				Entries: []*Value{
+					{
+						Value: &Value_StringValue{
+							StringValue: "item1",
+						},
+					},
+					{
+						Value: &Value_StringValue{
+							StringValue: "item2",
+						},
+					},
+				},
+			},
+			expected: []any{"item1", "item2"},
+		},
+		{
+			input: &List{
+				Entries: []*Value{
+					{
+						Value: &Value_LongValue{
+							LongValue: int64(1),
+						},
+					},
+					{
+						Value: &Value_LongValue{
+							LongValue: int64(2),
+						},
+					},
+				},
+			},
+			expected: []any{int64(1), int64(2)},
+		},
+		{
+			input: &List{
+				Entries: []*Value{
+					{
+						Value: &Value_BooleanValue{
+							BooleanValue: true,
+						},
+					},
+					{
+						Value: &Value_BooleanValue{
+							BooleanValue: false,
+						},
+					},
+				},
+			},
+			expected: []any{true, false},
+		},
+		{
+			input: &List{
+				Entries: []*Value{
+					{
+						Value: &valueUnknown{},
+					},
+				},
+			},
+			expected:    nil,
+			expectedErr: GetStrPtr("unsupported list value: unsupported value type: *protos.valueUnknown"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertFromListValue(tc.input)
 
 		assert.Equal(t, tc.expected, result)
 
@@ -853,6 +1014,20 @@ func TestConvertFromValue(t *testing.T) {
 		},
 		{
 			input: &Value{
+				Value: &Value_VectorValue{
+					VectorValue: &Vector{
+						Data: &Vector_FloatData{
+							FloatData: &FloatData{
+								Value: []float32{1, 2},
+							},
+						},
+					},
+				},
+			},
+			expected: []any{float32(1), float32(2)},
+		},
+		{
+			input: &Value{
 				Value: &valueUnknown{},
 			},
 			expected:    nil,
@@ -959,5 +1134,50 @@ func TestConvertFromFields(t *testing.T) {
 		if tc.expectedErr {
 			assert.Error(t, err)
 		}
+	}
+}
+
+type unknownVectorType struct{}
+
+func (*unknownVectorType) isVector_Data() {}
+
+func TestConvertFromVector(t *testing.T) {
+	testCases := []struct {
+		input       *Vector
+		expected    []any
+		expectedErr error
+	}{
+		{
+			input: &Vector{
+				Data: &Vector_FloatData{
+					FloatData: &FloatData{
+						Value: []float32{1, 2},
+					},
+				},
+			},
+			expected: []any{float32(1), float32(2)},
+		},
+		{
+			input: &Vector{
+				Data: &Vector_BoolData{
+					BoolData: &BoolData{
+						Value: []bool{true, false},
+					},
+				},
+			},
+			expected: []any{true, false},
+		},
+		{
+			input:       &Vector{Data: &unknownVectorType{}},
+			expected:    nil,
+			expectedErr: fmt.Errorf("unsupported value type: *protos.unknownVectorType"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := ConvertFromVector(tc.input)
+
+		assert.Equal(t, tc.expected, result)
+		assert.Equal(t, tc.expectedErr, err)
 	}
 }
