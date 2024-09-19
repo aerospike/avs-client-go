@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-var errConnectionProviderClosed = errors.New("connection provider is closed")
+var errConnectionProviderClosed = errors.New("connectionProvider is closed, cannot get connection")
 
 type grpcClientConn interface {
 	grpc.ClientConnInterface
