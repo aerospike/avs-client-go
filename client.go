@@ -72,12 +72,18 @@ func NewClient(
 	logger = logger.WithGroup("avs")
 	logger.Info("creating new client")
 
+	var grpcToken tokenManager
+
+	if credentials != nil {
+		grpcToken = newGrpcJWTToken(credentials.username, credentials.password, logger)
+	}
+
 	connectionProvider, err := newConnectionProvider(
 		ctx,
 		seeds,
 		listenerName,
 		isLoadBalancer,
-		credentials,
+		grpcToken,
 		tlsConfig,
 		logger,
 	)

@@ -23,10 +23,19 @@ import (
 
 var errConnectionProviderClosed = errors.New("connection provider is closed")
 
-type GrpcClientConn interface {
+type grpcClientConn interface {
 	grpc.ClientConnInterface
 	Target() string
 	Close() error
+}
+
+type tokenManager interface {
+	RequireTransportSecurity() bool
+	ScheduleRefresh(func() (*connection, error))
+	RefreshToken(context.Context, grpcClientConn) error
+	UnaryInterceptor() grpc.UnaryClientInterceptor
+	StreamInterceptor() grpc.StreamClientInterceptor
+	Close()
 }
 
 // connection represents a gRPC client connection and all the clients (stubs)
@@ -34,7 +43,7 @@ type GrpcClientConn interface {
 // multiple clients for the same connection. This follows the documented grpc
 // best practice of reusing connections.
 type connection struct {
-	grpcConn          GrpcClientConn
+	grpcConn          grpcClientConn
 	transactClient    protos.TransactServiceClient
 	authClient        protos.AuthServiceClient
 	userAdminClient   protos.UserAdminServiceClient
@@ -44,7 +53,7 @@ type connection struct {
 }
 
 // newConnection creates a new connection instance.
-func newConnection(conn GrpcClientConn) *connection {
+func newConnection(conn grpcClientConn) *connection {
 	return &connection{
 		grpcConn:          conn,
 		transactClient:    protos.NewTransactServiceClient(conn),
@@ -85,7 +94,7 @@ type connectionProvider struct {
 	clusterID      uint64
 	listenerName   *string
 	isLoadBalancer bool
-	token          *tokenManager
+	token          tokenManager
 	stopTendChan   chan struct{}
 	closed         atomic.Bool
 }
@@ -96,7 +105,7 @@ func newConnectionProvider(
 	seeds HostPortSlice,
 	listenerName *string,
 	isLoadBalancer bool,
-	credentials *UserPassCredentials,
+	token tokenManager,
 	tlsConfig *tls.Config,
 	logger *slog.Logger,
 ) (*connectionProvider, error) {
@@ -115,12 +124,7 @@ func newConnectionProvider(
 		return nil, errors.New(msg)
 	}
 
-	// Create a token manager if username and password are provided.
-	var token *tokenManager
-
-	if credentials != nil {
-		token = newJWTToken(credentials.username, credentials.password, logger)
-
+	if token != nil {
 		if token.RequireTransportSecurity() && tlsConfig == nil {
 			msg := "tlsConfig is required when username/password authentication"
 			logger.Error(msg)
@@ -324,7 +328,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 	var authErr error
 
 	wg := sync.WaitGroup{}
-	seedGrpcConns := make(chan GrpcClientConn)
+	seedGrpcConns := make(chan grpcClientConn)
 	cp.seedConns = []*connection{}
 	tokenLock := sync.Mutex{} // Ensures only one thread attempts to update token at a time
 	tokenUpdated := false     // Ensures token update only occurs once
@@ -444,11 +448,11 @@ func (cp *connectionProvider) checkAndSetClusterID(clusterID uint64) bool {
 }
 
 // getTendConns returns all the gRPC client connections for tend operations.
-func (cp *connectionProvider) getTendConns() []GrpcClientConn {
+func (cp *connectionProvider) getTendConns() []grpcClientConn {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	conns := make([]GrpcClientConn, len(cp.seedConns)+len(cp.nodeConns))
+	conns := make([]grpcClientConn, len(cp.seedConns)+len(cp.nodeConns))
 	i := 0
 
 	for _, conn := range cp.seedConns {
@@ -474,7 +478,7 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 	for _, conn := range conns {
 		wg.Add(1)
 
-		go func(conn GrpcClientConn) {
+		go func(conn grpcClientConn) {
 			defer wg.Done()
 
 			logger := cp.logger.With(slog.String("host", conn.Target()))
@@ -685,7 +689,7 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 // successful endpoint in endpoints.
 func (cp *connectionProvider) createGrpcConnFromEndpoints(
 	endpoints *protos.ServerEndpointList,
-) (GrpcClientConn, error) {
+) (grpcClientConn, error) {
 	for _, endpoint := range endpoints.Endpoints {
 		if strings.ContainsRune(endpoint.Address, ':') {
 			continue // TODO: Add logging and support for IPv6
@@ -703,7 +707,7 @@ func (cp *connectionProvider) createGrpcConnFromEndpoints(
 
 // createGrcpConn creates a gRPC client connection to a host. This handles adding
 // credential and configuring tls.
-func (cp *connectionProvider) createGrcpConn(hostPort *HostPort) (GrpcClientConn, error) {
+func (cp *connectionProvider) createGrcpConn(hostPort *HostPort) (grpcClientConn, error) {
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {

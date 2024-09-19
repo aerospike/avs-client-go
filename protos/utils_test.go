@@ -1024,7 +1024,7 @@ func TestConvertFromValue(t *testing.T) {
 					},
 				},
 			},
-			expected: []any{float32(1), float32(2)},
+			expected: []float32{float32(1), float32(2)},
 		},
 		{
 			input: &Value{
@@ -1079,8 +1079,11 @@ func TestConvertToFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		result, err := ConvertToFields(tc.input)
+		assert.Equal(t, len(tc.expected), len(result))
 
-		assert.Equal(t, tc.expected, result)
+		for i, _ := range tc.expected {
+			assert.EqualExportedValues(t, tc.expected[i], result[i])
+		}
 
 		if tc.expectedErr {
 			assert.Error(t, err)
@@ -1144,7 +1147,7 @@ func (*unknownVectorType) isVector_Data() {}
 func TestConvertFromVector(t *testing.T) {
 	testCases := []struct {
 		input       *Vector
-		expected    []any
+		expected    any
 		expectedErr error
 	}{
 		{
@@ -1155,7 +1158,7 @@ func TestConvertFromVector(t *testing.T) {
 					},
 				},
 			},
-			expected: []any{float32(1), float32(2)},
+			expected: []float32{float32(1), float32(2)},
 		},
 		{
 			input: &Vector{
@@ -1165,12 +1168,12 @@ func TestConvertFromVector(t *testing.T) {
 					},
 				},
 			},
-			expected: []any{true, false},
+			expected: []bool{true, false},
 		},
 		{
 			input:       &Vector{Data: &unknownVectorType{}},
 			expected:    nil,
-			expectedErr: fmt.Errorf("unsupported value type: *protos.unknownVectorType"),
+			expectedErr: fmt.Errorf("unsupported vector data type: *protos.unknownVectorType"),
 		},
 	}
 

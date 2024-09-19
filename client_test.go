@@ -3209,7 +3209,7 @@ func TestConnectedNodeEndpoint_Success(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConnProvider := NewMockconnProvider(ctrl)
-	mockGrpcConn := NewMockGrpcClientConn(ctrl)
+	mockGrpcConn := NewMockgrpcClientConn(ctrl)
 	mockConn := &connection{
 		grpcConn: mockGrpcConn,
 	}
@@ -3247,7 +3247,7 @@ func TestConnectedNodeEndpoint_FailedGetConn(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConnProvider := NewMockconnProvider(ctrl)
-	mockGrpcConn := NewMockGrpcClientConn(ctrl)
+	mockGrpcConn := NewMockgrpcClientConn(ctrl)
 	mockConn := &connection{
 		grpcConn: mockGrpcConn,
 	}
@@ -3276,7 +3276,7 @@ func TestConnectedNodeEndpoint_FailParsePort(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockConnProvider := NewMockconnProvider(ctrl)
-	mockGrpcConn := NewMockGrpcClientConn(ctrl)
+	mockGrpcConn := NewMockgrpcClientConn(ctrl)
 	mockConn := &connection{
 		grpcConn: mockGrpcConn,
 	}
