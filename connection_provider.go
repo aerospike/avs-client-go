@@ -151,7 +151,6 @@ func newConnectionProvider(
 	// Connect to the seed nodes.
 	err := cp.connectToSeeds(ctx)
 	if err != nil {
-		cp.Close()
 		logger.Error("failed to connect to seeds", slog.Any("error", err))
 		return nil, err
 	}
