@@ -63,7 +63,7 @@ func TestInsert_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -92,7 +92,7 @@ func TestInsert_FailsGettingConn(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -127,7 +127,7 @@ func TestInsert_FailsConvertingKey(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -162,7 +162,7 @@ func TestInsert_FailsConvertingFields(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -202,7 +202,7 @@ func TestInsert_FailsPutRequest(t *testing.T) {
 		Return(&emptypb.Empty{}, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -270,7 +270,7 @@ func TestUpdate_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -338,7 +338,7 @@ func TestReplace_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -422,7 +422,7 @@ func TestGet_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -450,7 +450,7 @@ func TestGet_FailsGettingConn(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -483,7 +483,7 @@ func TestGet_FailsConvertingKey(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -521,7 +521,7 @@ func TestGet_FailsGetRequest(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -573,7 +573,7 @@ func TestDelete_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -600,7 +600,7 @@ func TestDelete_FailsGettingConn(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -633,7 +633,7 @@ func TestDelete_FailsConvertingKey(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -671,7 +671,7 @@ func TestDelete_FailsDeleteRequest(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -725,7 +725,7 @@ func TestExists_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -753,7 +753,7 @@ func TestExists_FailsGettingConn(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -786,7 +786,7 @@ func TestExists_FailsConvertingKey(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -824,7 +824,7 @@ func TestExists_FailsDeleteRequest(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -882,7 +882,7 @@ func TestIsIndexed_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -911,7 +911,7 @@ func TestIsIndexed_FailsGettingConn(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -945,7 +945,7 @@ func TestIsIndexed_FailsConvertingKey(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -984,7 +984,7 @@ func TestIsIndexed_FailsDeleteRequest(t *testing.T) {
 		Return(mockConn, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1142,7 +1142,7 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 	}
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1177,7 +1177,7 @@ func TestVectorSearchFloat32_FailsGettingConn(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1219,7 +1219,7 @@ func TestVectorSearchFloat32_FailsVectorSearch(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1272,7 +1272,7 @@ func TestVectorSearchFloat32_FailedToRecvAllNeighbors(t *testing.T) {
 		)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1331,7 +1331,7 @@ func TestVectorSearchFloat32_FailedToConvertNeighbor(t *testing.T) {
 		)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1388,7 +1388,7 @@ func TestWaitForIndexCompletion_SuccessAfterZeroCountReturnedTwice(t *testing.T)
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1446,7 +1446,7 @@ func TestWaitForIndexCompletion_SuccessAfterNonZeroUnmergedCount(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1476,7 +1476,7 @@ func TestWaitForIndexCompletion_FailToGetRandomConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1513,7 +1513,7 @@ func TestWaitForIndexCompletion_FailGetStatusCall(t *testing.T) {
 		Return(nil, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1550,7 +1550,7 @@ func TestWaitForIndexCompletion_FailTimeout(t *testing.T) {
 		Return(nil, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1607,7 +1607,7 @@ func TestIndexCreateFromIndexDef_Success(t *testing.T) {
 		Return(nil, nil)
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1641,7 +1641,7 @@ func TestIndexCreateFromIndexDef_FailGetConn(t *testing.T) {
 	}
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1682,7 +1682,7 @@ func TestIndexCreateFromIndexDef_FailCreateCall(t *testing.T) {
 	}
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1734,7 +1734,7 @@ func TestIndexUpdate_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1769,7 +1769,7 @@ func TestIndexUpdate_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1811,7 +1811,7 @@ func TestIndexUpdate_FailUpdateCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1869,7 +1869,7 @@ func TestIndexDrop_Success(t *testing.T) {
 		Return(nil, status.Errorf(codes.NotFound, "foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1898,7 +1898,7 @@ func TestIndexDrop_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1934,7 +1934,7 @@ func TestIndexDrop_FailDropCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -1994,7 +1994,7 @@ func TestIndexList_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2022,7 +2022,7 @@ func TestIndexList_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2055,7 +2055,7 @@ func TestIndexList_FailDropCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2107,7 +2107,7 @@ func TestIndexGet_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2137,7 +2137,7 @@ func TestIndexGet_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2173,7 +2173,7 @@ func TestIndexGet_FailDropCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2223,7 +2223,7 @@ func TestIndexGetStatus_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2253,7 +2253,7 @@ func TestIndexGetStatus_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2289,7 +2289,7 @@ func TestIndexGetStatus_FailDropCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2337,7 +2337,7 @@ func TestIndexGcInvalidVertices_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2366,7 +2366,7 @@ func TestIndexGcInvalidVertices_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2403,7 +2403,7 @@ func TestIndexGcInvalidVertices_FailDropCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2457,7 +2457,7 @@ func TestCreateUser_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2487,7 +2487,7 @@ func TestCreateUser_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2524,7 +2524,7 @@ func TestCreateUser_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2575,7 +2575,7 @@ func TestUpdateCredentials_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2604,7 +2604,7 @@ func TestUpdateCredentials_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2640,7 +2640,7 @@ func TestUpdateCredentials_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2683,7 +2683,7 @@ func TestDropUser_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2711,7 +2711,7 @@ func TestDropUser_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2746,7 +2746,7 @@ func TestDropUser_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2795,7 +2795,7 @@ func TestGetUser_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2824,7 +2824,7 @@ func TestGetUser_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2859,7 +2859,7 @@ func TestGetUser_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2911,7 +2911,7 @@ func TestListUsers_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2939,7 +2939,7 @@ func TestListUsers_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -2973,7 +2973,7 @@ func TestListUsers_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3015,7 +3015,7 @@ func TestRevokeRoles_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3044,7 +3044,7 @@ func TestRevokeRoles_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3080,7 +3080,7 @@ func TestRevokeRoles_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3129,7 +3129,7 @@ func TestListRoles_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3157,7 +3157,7 @@ func TestListRoles_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3191,7 +3191,7 @@ func TestListRoles_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3230,7 +3230,7 @@ func TestConnectedNodeEndpoint_Success(t *testing.T) {
 		Return("1.1.1.1:3000")
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3258,7 +3258,7 @@ func TestConnectedNodeEndpoint_FailedGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3292,7 +3292,7 @@ func TestConnectedNodeEndpoint_FailParsePort(t *testing.T) {
 		Return("1.1.1.1:aaaa")
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3335,7 +3335,7 @@ func TestClusteringState_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3363,7 +3363,7 @@ func TestClusteringState_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3397,7 +3397,7 @@ func TestClusteringState_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3441,7 +3441,7 @@ func TestClusterEndpoints_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3469,7 +3469,7 @@ func TestClusterEndpoints_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3504,7 +3504,7 @@ func TestClusterEndpoints_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3544,7 +3544,7 @@ func TestAbout_Success(t *testing.T) {
 		})
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3572,7 +3572,7 @@ func TestAbout_FailGetConn(t *testing.T) {
 		Return(mockConn, fmt.Errorf("foo"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters
@@ -3606,7 +3606,7 @@ func TestAbout_FailCall(t *testing.T) {
 		Return(nil, fmt.Errorf("bar"))
 
 	// Create the client with the mock connProvider
-	client, err := newClient(mockConnProvider, slog.Default())
+	client, err := newClient(mockConnProvider, nil, slog.Default())
 	assert.NoError(t, err)
 
 	// Prepare input parameters

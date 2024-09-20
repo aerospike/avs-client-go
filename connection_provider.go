@@ -96,6 +96,7 @@ type connectionProvider struct {
 	isLoadBalancer bool
 	token          tokenManager
 	stopTendChan   chan struct{}
+	initialized    bool
 	closed         atomic.Bool
 }
 
@@ -151,6 +152,7 @@ func newConnectionProvider(
 	// Connect to the seed nodes.
 	err := cp.connectToSeeds(ctx)
 	if err != nil {
+		cp.Close()
 		logger.Error("failed to connect to seeds", slog.Any("error", err))
 		return nil, err
 	}
@@ -170,6 +172,8 @@ func newConnectionProvider(
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
 	}
 
+	cp.initialized = true
+
 	return cp, nil
 }
 
@@ -179,16 +183,12 @@ func (cp *connectionProvider) Close() error {
 		return nil
 	}
 
-	if !cp.isLoadBalancer {
+	if !cp.isLoadBalancer && cp.initialized {
 		cp.stopTendChan <- struct{}{}
 		<-cp.stopTendChan
 	}
 
 	var firstErr error
-
-	if cp.token != nil {
-		cp.token.Close()
-	}
 
 	for _, conn := range cp.seedConns {
 		err := conn.grpcConn.Close()

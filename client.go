@@ -41,6 +41,7 @@ type connProvider interface {
 type Client struct {
 	logger             *slog.Logger
 	connectionProvider connProvider
+	token              tokenManager
 }
 
 // NewClient creates a new Client instance.
@@ -88,19 +89,22 @@ func NewClient(
 		logger,
 	)
 	if err != nil {
+		grpcToken.Close()
 		logger.Error("failed to create connection provider", slog.Any("error", err))
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
 	}
 
-	return newClient(connectionProvider, logger)
+	return newClient(connectionProvider, grpcToken, logger)
 }
 
 func newClient(
 	connectionProvider connProvider,
+	token tokenManager,
 	logger *slog.Logger,
 ) (*Client, error) {
 	return &Client{
 		logger:             logger,
+		token:              token,
 		connectionProvider: connectionProvider,
 	}, nil
 }
@@ -112,6 +116,10 @@ func newClient(
 //	error: An error if the closure fails, otherwise nil.
 func (c *Client) Close() error {
 	c.logger.Info("Closing client")
+
+	if c.token != nil {
+		c.token.Close()
+	}
 
 	return c.connectionProvider.Close()
 }

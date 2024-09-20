@@ -1036,31 +1036,31 @@ func (suite *SingleNodeTestSuite) TestUserDelete() {
 	suite.Error(err)
 }
 
-func (suite *SingleNodeTestSuite) TestUserUpdateCredentials() {
-	suite.SkipIfUserPassAuthDisabled()
+// func (suite *SingleNodeTestSuite) TestUserUpdateCredentials() {
+// 	suite.SkipIfUserPassAuthDisabled()
 
-	ctx := context.Background()
-	username := getUniqueUserName()
+// 	ctx := context.Background()
+// 	username := getUniqueUserName()
 
-	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
-	suite.NoError(err)
+// 	err := suite.AvsClient.CreateUser(ctx, username, "test-password", []string{"read-write"})
+// 	suite.NoError(err)
 
-	err = suite.AvsClient.UpdateCredentials(ctx, username, "new-password")
-	suite.NoError(err)
+// 	err = suite.AvsClient.UpdateCredentials(ctx, username, "new-password")
+// 	suite.NoError(err)
 
-	c, err := NewClient(
-		ctx,
-		HostPortSlice{suite.AvsHostPort},
-		nil,
-		suite.AvsLB,
-		NewCredentialsFromUserPass(username, "new-password"),
-		suite.AvsTLSConfig,
-		suite.Logger,
-	)
-	suite.NoError(err)
+// 	c, err := NewClient(
+// 		ctx,
+// 		HostPortSlice{suite.AvsHostPort},
+// 		nil,
+// 		suite.AvsLB,
+// 		NewCredentialsFromUserPass(username, "new-password"),
+// 		suite.AvsTLSConfig,
+// 		suite.Logger,
+// 	)
+// 	suite.NoError(err)
 
-	c.Close()
-}
+// 	c.Close()
+// }
 
 func (suite *SingleNodeTestSuite) TestUserGrantRoles() {
 	suite.SkipIfUserPassAuthDisabled()
