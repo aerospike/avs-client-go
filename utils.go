@@ -1,6 +1,7 @@
 package avs
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -72,6 +73,49 @@ func createIndexStatusRequest(namespace, name string) *protos.IndexStatusRequest
 			Name:      name,
 		},
 	}
+}
+
+func endpointEqual(a, b *protos.ServerEndpoint) bool {
+	return a.Address == b.Address && a.Port == b.Port && a.IsTls == b.IsTls
+}
+
+func endpointListEqual(a, b *protos.ServerEndpointList) bool {
+	if len(a.Endpoints) != len(b.Endpoints) {
+		return false
+	}
+
+	aEndpoints := make([]*protos.ServerEndpoint, len(a.Endpoints))
+	copy(aEndpoints, a.Endpoints)
+
+	bEndpoints := make([]*protos.ServerEndpoint, len(b.Endpoints))
+	copy(bEndpoints, b.Endpoints)
+
+	sortFunc := func(endpoints []*protos.ServerEndpoint) func(int, int) bool {
+		return func(i, j int) bool {
+			if endpoints[i].Address < endpoints[j].Address {
+				return true
+			} else if endpoints[i].Address > endpoints[j].Address {
+				return false
+			}
+
+			return endpoints[i].Port < endpoints[j].Port
+		}
+	}
+
+	sort.Slice(aEndpoints, sortFunc(aEndpoints))
+	sort.Slice(bEndpoints, sortFunc(bEndpoints))
+
+	for i, endpoint := range aEndpoints {
+		if !endpointEqual(endpoint, bEndpoints[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
+	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
 var minimumFullySupportedAVSVersion = newVersion("0.10.0")

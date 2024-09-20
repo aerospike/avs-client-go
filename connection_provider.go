@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -450,20 +449,20 @@ func (cp *connectionProvider) checkAndSetClusterID(clusterID uint64) bool {
 }
 
 // getTendConns returns all the gRPC client connections for tend operations.
-func (cp *connectionProvider) getTendConns() []grpcClientConn {
+func (cp *connectionProvider) getTendConns() []*connection {
 	cp.nodeConnsLock.RLock()
 	defer cp.nodeConnsLock.RUnlock()
 
-	conns := make([]grpcClientConn, len(cp.seedConns)+len(cp.nodeConns))
+	conns := make([]*connection, len(cp.seedConns)+len(cp.nodeConns))
 	i := 0
 
 	for _, conn := range cp.seedConns {
-		conns[i] = conn.grpcConn
+		conns[i] = conn
 		i++
 	}
 
 	for _, conn := range cp.nodeConns {
-		conns[i] = conn.conn.grpcConn
+		conns[i] = conn.conn
 		i++
 	}
 
@@ -480,13 +479,12 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 	for _, conn := range conns {
 		wg.Add(1)
 
-		go func(conn grpcClientConn) {
+		go func(conn *connection) {
 			defer wg.Done()
 
-			logger := cp.logger.With(slog.String("host", conn.Target()))
-			client := protos.NewClusterInfoServiceClient(conn)
+			logger := cp.logger.With(slog.String("host", conn.grpcConn.Target()))
 
-			clusterID, err := client.GetClusterId(ctx, &emptypb.Empty{})
+			clusterID, err := conn.clusterInfoClient.GetClusterId(ctx, &emptypb.Empty{})
 			if err != nil {
 				logger.WarnContext(ctx, "failed to get cluster ID", slog.Any("error", err))
 			}
@@ -503,7 +501,7 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 
 			logger.DebugContext(ctx, "new cluster ID found", slog.Uint64("clusterID", clusterID.GetId()))
 
-			endpointsResp, err := client.GetClusterEndpoints(ctx, endpointsReq)
+			endpointsResp, err := conn.clusterInfoClient.GetClusterEndpoints(ctx, endpointsReq)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to get cluster endpoints", slog.Any("error", err))
 				return
@@ -642,49 +640,6 @@ func (cp *connectionProvider) tend(ctx context.Context) {
 			return
 		}
 	}
-}
-
-func endpointEqual(a, b *protos.ServerEndpoint) bool {
-	return a.Address == b.Address && a.Port == b.Port && a.IsTls == b.IsTls
-}
-
-func endpointListEqual(a, b *protos.ServerEndpointList) bool {
-	if len(a.Endpoints) != len(b.Endpoints) {
-		return false
-	}
-
-	aEndpoints := make([]*protos.ServerEndpoint, len(a.Endpoints))
-	copy(aEndpoints, a.Endpoints)
-
-	bEndpoints := make([]*protos.ServerEndpoint, len(b.Endpoints))
-	copy(bEndpoints, b.Endpoints)
-
-	sortFunc := func(endpoints []*protos.ServerEndpoint) func(int, int) bool {
-		return func(i, j int) bool {
-			if endpoints[i].Address < endpoints[j].Address {
-				return true
-			} else if endpoints[i].Address > endpoints[j].Address {
-				return false
-			}
-
-			return endpoints[i].Port < endpoints[j].Port
-		}
-	}
-
-	sort.Slice(aEndpoints, sortFunc(aEndpoints))
-	sort.Slice(bEndpoints, sortFunc(bEndpoints))
-
-	for i, endpoint := range aEndpoints {
-		if !endpointEqual(endpoint, bEndpoints[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
-	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
 // createGrpcConnFromEndpoints creates a gRPC client connection from the first
