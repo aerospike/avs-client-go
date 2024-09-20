@@ -2,6 +2,7 @@ package protos
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1077,9 +1078,18 @@ func TestConvertToFields(t *testing.T) {
 		},
 	}
 
+	sortFunc := func(fields []*Field) func(int, int) bool {
+		return func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
+		}
+	}
+
 	for _, tc := range testCases {
 		result, err := ConvertToFields(tc.input)
 		assert.Equal(t, len(tc.expected), len(result))
+
+		sort.Slice(result, sortFunc(result))
+		sort.Slice(tc.expected, sortFunc(result))
 
 		for i, _ := range tc.expected {
 			assert.EqualExportedValues(t, tc.expected[i], result[i])
