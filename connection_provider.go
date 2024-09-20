@@ -175,6 +175,10 @@ func newConnectionProvider(
 
 // Close closes the connectionProvider and releases all resources.
 func (cp *connectionProvider) Close() error {
+	if cp == nil {
+		return nil
+	}
+
 	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
 		<-cp.stopTendChan

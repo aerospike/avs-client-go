@@ -112,6 +112,7 @@ func newClient(
 //	error: An error if the closure fails, otherwise nil.
 func (c *Client) Close() error {
 	c.logger.Info("Closing client")
+
 	return c.connectionProvider.Close()
 }
 

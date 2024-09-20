@@ -24,6 +24,7 @@ func TestNewConnectionProvider_FailSeedsNil(t *testing.T) {
 	var token tokenManager
 
 	cp, err := newConnectionProvider(context.Background(), seeds, &listenerName, isLoadBalancer, token, tlsConfig, logger)
+	defer cp.Close()
 
 	assert.Nil(t, cp)
 	assert.Equal(t, err, errors.New("seeds cannot be nil or empty"))
@@ -53,6 +54,7 @@ func TestNewConnectionProvider_FailNoTLS(t *testing.T) {
 		Return(true)
 
 	cp, err := newConnectionProvider(context.Background(), seeds, &listenerName, isLoadBalancer, token, tlsConfig, logger)
+	defer cp.Close()
 
 	assert.Nil(t, cp)
 	assert.Equal(t, err, errors.New("tlsConfig is required when username/password authentication"))
@@ -79,6 +81,7 @@ func TestNewConnectionProvider_FailConnectToSeedConns(t *testing.T) {
 	var token tokenManager
 
 	cp, err := newConnectionProvider(ctx, seeds, &listenerName, isLoadBalancer, token, tlsConfig, logger)
+	defer cp.Close()
 
 	assert.Nil(t, cp)
 	assert.Equal(t, "failed to connect to seeds: context deadline exceeded", err.Error())
