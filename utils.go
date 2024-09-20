@@ -56,7 +56,9 @@ func createProjectionSpec(includeFields, excludeFields []string) *protos.Project
 			Type:   protos.ProjectionType_SPECIFIED,
 			Fields: includeFields,
 		}
-	} else if excludeFields != nil {
+	}
+
+	if excludeFields != nil {
 		spec.Exclude = &protos.ProjectionFilter{
 			Type:   protos.ProjectionType_SPECIFIED,
 			Fields: excludeFields,
