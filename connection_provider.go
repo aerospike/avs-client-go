@@ -96,7 +96,6 @@ type connectionProvider struct {
 	isLoadBalancer bool
 	token          tokenManager
 	stopTendChan   chan struct{}
-	initialized    bool
 	closed         atomic.Bool
 }
 
@@ -172,8 +171,6 @@ func newConnectionProvider(
 		cp.logger.Debug("load balancer is enabled, not starting tend routine")
 	}
 
-	cp.initialized = true
-
 	return cp, nil
 }
 
@@ -183,7 +180,7 @@ func (cp *connectionProvider) Close() error {
 		return nil
 	}
 
-	if !cp.isLoadBalancer && cp.initialized {
+	if !cp.isLoadBalancer {
 		cp.stopTendChan <- struct{}{}
 		<-cp.stopTendChan
 	}
@@ -348,6 +345,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 			grpcConn, err := cp.createGrcpConn(seed)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create connection", slog.Any("error", err))
+				grpcConn.Close()
 				return
 			}
 
@@ -363,7 +361,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
 						tokenLock.Unlock()
-
+						grpcConn.Close()
 						return
 					}
 
@@ -380,6 +378,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 				about, err := client.Get(ctx, &protos.AboutRequest{})
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
+					grpcConn.Close()
 					return
 				}
 
