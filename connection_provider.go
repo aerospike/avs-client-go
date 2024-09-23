@@ -31,7 +31,7 @@ type grpcClientConn interface {
 type tokenManager interface {
 	RequireTransportSecurity() bool
 	ScheduleRefresh(func() (*connection, error))
-	RefreshToken(context.Context, grpcClientConn) error
+	RefreshToken(context.Context, *connection) error
 	UnaryInterceptor() grpc.UnaryClientInterceptor
 	StreamInterceptor() grpc.StreamClientInterceptor
 	Close()
@@ -62,6 +62,10 @@ func newConnection(conn grpcClientConn) *connection {
 		aboutClient:       protos.NewAboutServiceClient(conn),
 		clusterInfoClient: protos.NewClusterInfoServiceClient(conn),
 	}
+}
+
+func (conn *connection) close() error {
+	return conn.grpcConn.Close()
 }
 
 // connectionAndEndpoints represents a combination of a gRPC client connection and server endpoints.
@@ -186,7 +190,7 @@ func (cp *connectionProvider) Close() error {
 	var firstErr error
 
 	for _, conn := range cp.seedConns {
-		err := conn.grpcConn.Close()
+		err := conn.close()
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -327,7 +331,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 	var authErr error
 
 	wg := sync.WaitGroup{}
-	seedGrpcConns := make(chan grpcClientConn)
+	seedConns := make(chan *connection)
 	cp.seedConns = []*connection{}
 	tokenLock := sync.Mutex{} // Ensures only one thread attempts to update token at a time
 	tokenUpdated := false     // Ensures token update only occurs once
@@ -348,18 +352,19 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 			}
 
 			extraCheck := true
+			conn := newConnection(grpcConn)
 
 			if cp.token != nil {
 				// Only one thread needs to refresh the token. Only first will
 				// succeed others will block
 				tokenLock.Lock()
 				if !tokenUpdated {
-					err := cp.token.RefreshToken(ctx, grpcConn)
+					err := cp.token.RefreshToken(ctx, conn)
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
 						tokenLock.Unlock()
-						grpcConn.Close()
+						conn.close()
 						return
 					}
 
@@ -371,9 +376,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 			}
 
 			if extraCheck {
-				client := protos.NewAboutServiceClient(grpcConn)
-
-				about, err := client.Get(ctx, &protos.AboutRequest{})
+				about, err := conn.aboutClient.Get(ctx, &protos.AboutRequest{})
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
 					grpcConn.Close()
@@ -385,17 +388,17 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 				}
 			}
 
-			seedGrpcConns <- grpcConn
+			seedConns <- conn
 		}(seed)
 	}
 
 	go func() {
 		wg.Wait()
-		close(seedGrpcConns)
+		close(seedConns)
 	}()
 
-	for conn := range seedGrpcConns {
-		cp.seedConns = append(cp.seedConns, newConnection(conn))
+	for conn := range seedConns {
+		cp.seedConns = append(cp.seedConns, conn)
 	}
 
 	if len(cp.seedConns) == 0 {

@@ -62,10 +62,9 @@ func (tm *grpcTokenManager) setRefreshTimeFromTTL(ttl time.Duration) {
 // RefreshToken refreshes the authentication token using the provided gRPC client connection.
 // It returns a boolean indicating if the token was successfully refreshed and
 // an error if any. It is not thread safe.
-func (tm *grpcTokenManager) RefreshToken(ctx context.Context, conn grpcClientConn) error {
+func (tm *grpcTokenManager) RefreshToken(ctx context.Context, conn *connection) error {
 	// We only want one goroutine to refresh the token at a time
-	client := protos.NewAuthServiceClient(conn)
-	resp, err := client.Authenticate(ctx, &protos.AuthRequest{
+	resp, err := conn.authClient.Authenticate(ctx, &protos.AuthRequest{
 		Credentials: createUserPassCredential(tm.username, tm.password),
 	})
 
@@ -74,6 +73,11 @@ func (tm *grpcTokenManager) RefreshToken(ctx context.Context, conn grpcClientCon
 	}
 
 	claims := strings.Split(resp.GetToken(), ".")
+
+	if len(claims) < 3 {
+		return fmt.Errorf("failed to authenticate: missing either header, payload, or signature")
+	}
+
 	decClaims, err := base64.RawURLEncoding.DecodeString(claims[1])
 
 	if err != nil {
@@ -89,17 +93,17 @@ func (tm *grpcTokenManager) RefreshToken(ctx context.Context, conn grpcClientCon
 
 	expiryToken, ok := tokenMap["exp"].(float64)
 	if !ok {
-		return fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("failed to authenticate: unable to find exp in token")
 	}
 
 	iat, ok := tokenMap["iat"].(float64)
 	if !ok {
-		return fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("failed to authenticate: unable to find iat in token")
 	}
 
 	ttl := time.Duration(expiryToken-iat) * time.Second
 	if ttl <= 0 {
-		return fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("failed to authenticate: jwt ttl is less than 0")
 	}
 
 	tm.logger.DebugContext(
@@ -139,7 +143,7 @@ func (tm *grpcTokenManager) ScheduleRefresh(getConn func() (*connection, error))
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-			err = tm.RefreshToken(ctx, connClients.grpcConn)
+			err = tm.RefreshToken(ctx, connClients)
 			if err != nil {
 				tm.logger.Warn("failed to refresh token", slog.Any("error", err))
 			}

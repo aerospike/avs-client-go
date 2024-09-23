@@ -210,14 +210,14 @@ func TestEndpointListEqual(t *testing.T) {
 			endpoints2: &protos.ServerEndpointList{
 				Endpoints: []*protos.ServerEndpoint{
 					{
-						Address: "localhost",
-						Port:    8080,
-						IsTls:   false,
-					},
-					{
 						Address: "127.0.0.1",
 						Port:    9090,
 						IsTls:   true,
+					},
+					{
+						Address: "localhost",
+						Port:    8080,
+						IsTls:   false,
 					},
 				},
 			},
