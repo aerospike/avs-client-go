@@ -65,7 +65,11 @@ func newConnection(conn grpcClientConn) *connection {
 }
 
 func (conn *connection) close() error {
-	return conn.grpcConn.Close()
+	if conn.grpcConn != nil {
+		return conn.grpcConn.Close()
+	}
+
+	return nil
 }
 
 // connectionAndEndpoints represents a combination of a gRPC client connection and server endpoints.
@@ -354,7 +358,6 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 			grpcConn, err := cp.grpcConnFactory(seed)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create connection", slog.Any("error", err))
-				grpcConn.Close()
 				return
 			}
 
