@@ -249,143 +249,213 @@ func TestUpdateClusterConns_NoNewClusterID(t *testing.T) {
 	assert.Len(t, cp.nodeConns, 2)
 }
 
-// func TestUpdateClusterConns_NewClusterID(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
-// 	defer ctrl.Finish()
+func TestUpdateClusterConns_NewClusterID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-// 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-// 	defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
 
-// 	cp := &connectionProvider{
-// 		logger:         slog.Default(),
-// 		nodeConns:      make(map[uint64]*connectionAndEndpoints),
-// 		seedConns:      []*connection{},
-// 		tlsConfig:      &tls.Config{},
-// 		seeds:          HostPortSlice{},
-// 		nodeConnsLock:  &sync.RWMutex{},
-// 		tendInterval:   time.Second * 1,
-// 		clusterID:      123,
-// 		listenerName:   nil,
-// 		isLoadBalancer: false,
-// 		token:          nil,
-// 		stopTendChan:   make(chan struct{}),
-// 		closed:         atomic.Bool{},
-// 	}
+	mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
+	mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
 
-// 	cp.logger = cp.logger.With(slog.String("test", "TestUpdateClusterConns_NewClusterID"))
+	mockClusterInfoClient1111 := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockClusterInfoClient2222 := protos.NewMockClusterInfoServiceClient(ctrl)
 
-// 	cp.logger.Debug("Setting up existing node connections")
+	mockAboutClient1111 := protos.NewMockAboutServiceClient(ctrl)
+	mockAboutClient2222 := protos.NewMockAboutServiceClient(ctrl)
 
-// 	grpcConn1 := NewMockgrpcClientConn(ctrl)
-// 	mockClusterInfoClient1 := protos.NewMockClusterInfoServiceClient(ctrl)
-// 	grpcConn2 := NewMockgrpcClientConn(ctrl)
-// 	mockClusterInfoClient2 := protos.NewMockClusterInfoServiceClient(ctrl)
+	mockAboutClient1111.
+		EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(nil, nil)
 
-// 	grpcConn1.
-// 		EXPECT().
-// 		Target().
-// 		Return("")
+	mockAboutClient2222.
+		EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(nil, nil)
 
-// 	mockClusterInfoClient1.
-// 		EXPECT().
-// 		GetClusterId(gomock.Any(), gomock.Any()).
-// 		Return(&protos.ClusterId{
-// 			Id: 123,
-// 		}, nil)
+	cp := &connectionProvider{
+		logger:         slog.Default(),
+		nodeConns:      make(map[uint64]*connectionAndEndpoints),
+		seedConns:      []*connection{},
+		tlsConfig:      &tls.Config{},
+		seeds:          HostPortSlice{},
+		nodeConnsLock:  &sync.RWMutex{},
+		tendInterval:   time.Second * 1,
+		clusterID:      123,
+		listenerName:   nil,
+		isLoadBalancer: false,
+		token:          nil,
+		stopTendChan:   make(chan struct{}),
+		closed:         atomic.Bool{},
+		grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+			if hostPort.String() == "1.1.1.1:3000" {
+				return mockNewGrpcConn1111, nil
+			} else if hostPort.String() == "2.2.2.2:3000" {
+				return mockNewGrpcConn2222, nil
+			}
 
-// 	grpcConn1.
-// 		EXPECT().
-// 		Close().
-// 		Return(nil)
+			return nil, fmt.Errorf("foo")
+		},
+		connFactory: func(grpcConn grpcClientConn) *connection {
+			if grpcConn == mockNewGrpcConn1111 {
+				return &connection{
+					clusterInfoClient: mockClusterInfoClient1111,
+					aboutClient:       mockAboutClient1111,
+				}
+			} else if grpcConn == mockNewGrpcConn2222 {
+				return &connection{
+					clusterInfoClient: mockClusterInfoClient2222,
+					aboutClient:       mockAboutClient2222,
+				}
+			}
 
-// 	grpcConn2.
-// 		EXPECT().
-// 		Target().
-// 		Return("")
+			return nil
+		},
+	}
 
-// 	mockClusterInfoClient2.
-// 		EXPECT().
-// 		GetClusterId(gomock.Any(), gomock.Any()).
-// 		Return(&protos.ClusterId{
-// 			Id: 456,
-// 		}, nil)
+	cp.logger = cp.logger.With(slog.String("test", "TestUpdateClusterConns_NewClusterID"))
 
-// 	mockClusterInfoClient2.
-// 		EXPECT().
-// 		GetClusterEndpoints(gomock.Any(), gomock.Any()).
-// 		Return(&protos.ClusterNodeEndpoints{
-// 			Endpoints: map[uint64]*protos.ServerEndpointList{
-// 				3: {
-// 					Endpoints: []*protos.ServerEndpoint{
-// 						{
-// 							Address: "1.1.1.1",
-// 							Port:    3000,
-// 						},
-// 					},
-// 				},
-// 				4: {
-// 					Endpoints: []*protos.ServerEndpoint{
-// 						{
-// 							Address: "2.2.2.2",
-// 							Port:    3000,
-// 						},
-// 					},
-// 				},
-// 			},
-// 		}, nil)
+	cp.logger.Debug("Setting up existing node connections")
 
-// 	grpcConn2.
-// 		EXPECT().
-// 		Close().
-// 		Return(nil)
+	grpcConn1 := NewMockgrpcClientConn(ctrl)
+	mockClusterInfoClient1 := protos.NewMockClusterInfoServiceClient(ctrl)
+	grpcConn2 := NewMockgrpcClientConn(ctrl)
+	mockClusterInfoClient2 := protos.NewMockClusterInfoServiceClient(ctrl)
 
-// 	// Existing node connections
-// 	cp.nodeConns[1] = &connectionAndEndpoints{
-// 		conn: &connection{
-// 			grpcConn:          grpcConn1,
-// 			clusterInfoClient: mockClusterInfoClient1,
-// 		},
-// 		endpoints: &protos.ServerEndpointList{},
-// 	}
+	grpcConn1.
+		EXPECT().
+		Target().
+		Return("")
 
-// 	cp.nodeConns[2] = &connectionAndEndpoints{
-// 		conn: &connection{
-// 			grpcConn:          grpcConn2,
-// 			clusterInfoClient: mockClusterInfoClient2,
-// 		},
-// 		endpoints: &protos.ServerEndpointList{},
-// 	}
+	mockClusterInfoClient1.
+		EXPECT().
+		GetClusterId(gomock.Any(), gomock.Any()).
+		Return(&protos.ClusterId{
+			Id: 789, // Different cluster id from client 2
+		}, nil)
 
-// 	cp.logger.Debug("Running updateClusterConns")
+	mockClusterInfoClient1.
+		EXPECT().
+		GetClusterEndpoints(gomock.Any(), gomock.Any()).
+		Return(&protos.ClusterNodeEndpoints{
+			Endpoints: map[uint64]*protos.ServerEndpointList{ // Smaller num of endpoints from client 2
+				0: {
+					Endpoints: []*protos.ServerEndpoint{
+						{
+							Address: "1.1.1.1",
+							Port:    3000,
+						},
+					},
+				},
+			},
+		}, nil)
 
-// 	// New cluster ID
-// 	// newEndpoints := &protos.ServerEndpointList{
-// 	// 	Endpoints: []*protos.ServerEndpoint{
-// 	// 		{
-// 	// 			Address: "host1",
-// 	// 			Port:    3000,
-// 	// 		},
-// 	// 		{
-// 	// 			Address: "host2",
-// 	// 			Port:    3000,
-// 	// 		},
-// 	// 	},
-// 	// }
+	grpcConn1.
+		EXPECT().
+		Close().
+		Return(nil)
 
-// 	cp.updateClusterConns(ctx)
+	grpcConn2.
+		EXPECT().
+		Target().
+		Return("")
 
-// 	// cp.checkAndSetNodeConns(ctx, map[uint64]*protos.ServerEndpointList{
-// 	// 	1: newEndpoints,
-// 	// 	2: newEndpoints,
-// 	// })
+	mockClusterInfoClient2.
+		EXPECT().
+		GetClusterId(gomock.Any(), gomock.Any()).
+		Return(&protos.ClusterId{
+			Id: 456,
+		}, nil)
 
-// 	// cp.removeDownNodes(map[uint64]*protos.ServerEndpointList{
-// 	// 	1: newEndpoints,
-// 	// 	2: newEndpoints,
-// 	// })
+	mockClusterInfoClient2.
+		EXPECT().
+		GetClusterEndpoints(gomock.Any(), gomock.Any()).
+		Return(&protos.ClusterNodeEndpoints{
+			Endpoints: map[uint64]*protos.ServerEndpointList{ // larger, so the cluster id 456 will win
+				3: {
+					Endpoints: []*protos.ServerEndpoint{
+						{
+							Address: "1.1.1.1",
+							Port:    3000,
+						},
+					},
+				},
+				4: {
+					Endpoints: []*protos.ServerEndpoint{
+						{
+							Address: "2.2.2.2",
+							Port:    3000,
+						},
+					},
+				},
+			},
+		}, nil)
 
-// 	// cp.updateClusterConns(ctx)
+	grpcConn2.
+		EXPECT().
+		Close().
+		Return(nil)
 
-// 	assert.Equal(t, uint64(456), cp.clusterID)
-// 	assert.Len(t, cp.nodeConns, 2)
-// }
+	// Existing node connections. These will be replaced after a new cluster is found.
+	cp.nodeConns = map[uint64]*connectionAndEndpoints{
+		1: {
+			conn: &connection{
+				grpcConn:          grpcConn1,
+				clusterInfoClient: mockClusterInfoClient1,
+			},
+			endpoints: &protos.ServerEndpointList{},
+		},
+		2: {
+			conn: &connection{
+				grpcConn:          grpcConn2,
+				clusterInfoClient: mockClusterInfoClient2,
+			},
+			endpoints: &protos.ServerEndpointList{},
+		},
+	}
+
+	// After a new cluster is discovered we expect these to be the new nodeConns
+	expectedNewNodeConns := map[uint64]*connectionAndEndpoints{
+		3: {
+			conn: &connection{
+				clusterInfoClient: mockClusterInfoClient1111,
+				aboutClient:       mockAboutClient1111,
+			},
+			endpoints: &protos.ServerEndpointList{
+				Endpoints: []*protos.ServerEndpoint{
+					{
+						Address: "1.1.1.1",
+						Port:    3000,
+					},
+				},
+			},
+		},
+		4: {
+			conn: &connection{
+				clusterInfoClient: mockClusterInfoClient2222,
+				aboutClient:       mockAboutClient2222,
+			},
+			endpoints: &protos.ServerEndpointList{
+				Endpoints: []*protos.ServerEndpoint{
+					{
+						Address: "2.2.2.2",
+						Port:    3000,
+					},
+				},
+			},
+		},
+	}
+
+	cp.logger.Debug("Running updateClusterConns")
+
+	cp.updateClusterConns(ctx)
+
+	assert.Equal(t, uint64(456), cp.clusterID)
+	assert.Len(t, cp.nodeConns, 2)
+
+	for k, v := range cp.nodeConns {
+		assert.EqualExportedValues(t, expectedNewNodeConns[k].endpoints, v.endpoints)
+	}
+}

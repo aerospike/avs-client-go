@@ -138,7 +138,7 @@ func TestRefreshToken_FailedToDecodeToken(t *testing.T) {
 		EXPECT().
 		Authenticate(gomock.Any(), gomock.Any()).
 		Return(&protos.AuthResponse{
-			Token: "badToken.blah.foo",
+			Token: "badToken.blahz.foo",
 		}, nil)
 
 	// Create the token manager with the
@@ -149,7 +149,7 @@ func TestRefreshToken_FailedToDecodeToken(t *testing.T) {
 
 	// Assert error occurred
 	assert.Error(t, err)
-	assert.Equal(t, "failed to authenticate: invalid character 'V' in literal null (expecting 'u')", err.Error())
+	assert.Equal(t, "failed to authenticate: illegal base64 data at input byte 4", err.Error())
 }
 
 func TestRefreshToken_FailedInvalidJson(t *testing.T) {

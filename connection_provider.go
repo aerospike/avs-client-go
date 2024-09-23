@@ -87,19 +87,21 @@ func newConnAndEndpoints(conn *connection, endpoints *protos.ServerEndpointList)
 //
 //nolint:govet // We will favor readability over field alignment
 type connectionProvider struct {
-	logger         *slog.Logger
-	nodeConns      map[uint64]*connectionAndEndpoints
-	seedConns      []*connection
-	tlsConfig      *tls.Config
-	seeds          HostPortSlice
-	nodeConnsLock  *sync.RWMutex
-	tendInterval   time.Duration
-	clusterID      uint64
-	listenerName   *string
-	isLoadBalancer bool
-	token          tokenManager
-	stopTendChan   chan struct{}
-	closed         atomic.Bool
+	logger          *slog.Logger
+	nodeConns       map[uint64]*connectionAndEndpoints
+	seedConns       []*connection
+	tlsConfig       *tls.Config
+	seeds           HostPortSlice
+	nodeConnsLock   *sync.RWMutex
+	tendInterval    time.Duration
+	clusterID       uint64
+	listenerName    *string
+	isLoadBalancer  bool
+	token           tokenManager
+	stopTendChan    chan struct{}
+	closed          atomic.Bool
+	grpcConnFactory func(hostPort *HostPort) (grpcClientConn, error) // For testing
+	connFactory     func(conn grpcClientConn) *connection            // For testing
 }
 
 // newConnectionProvider creates a new connectionProvider instance.
@@ -149,6 +151,11 @@ func newConnectionProvider(
 		stopTendChan:   make(chan struct{}),
 		logger:         logger,
 		closed:         atomic.Bool{},
+	}
+
+	cp.connFactory = newConnection
+	cp.grpcConnFactory = func(hostPort *HostPort) (grpcClientConn, error) {
+		return createGrcpConn(cp, hostPort)
 	}
 
 	// Connect to the seed nodes.
@@ -344,7 +351,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 
 			logger := cp.logger.With(slog.String("host", seed.String()))
 
-			grpcConn, err := cp.createGrcpConn(seed)
+			grpcConn, err := cp.grpcConnFactory(seed)
 			if err != nil {
 				logger.ErrorContext(ctx, "failed to create connection", slog.Any("error", err))
 				grpcConn.Close()
@@ -352,7 +359,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 			}
 
 			extraCheck := true
-			conn := newConnection(grpcConn)
+			conn := cp.connFactory(grpcConn)
 
 			if cp.token != nil {
 				// Only one thread needs to refresh the token. Only first will
@@ -441,16 +448,6 @@ func (cp *connectionProvider) updateNodeConns(
 	return nil
 }
 
-// checkAndSetClusterID checks if the cluster ID has changed and updates it if necessary.
-func (cp *connectionProvider) checkAndSetClusterID(clusterID uint64) bool {
-	if clusterID != cp.clusterID {
-		cp.clusterID = clusterID
-		return true
-	}
-
-	return false
-}
-
 // getTendConns returns all the gRPC client connections for tend operations.
 func (cp *connectionProvider) getTendConns() []*connection {
 	cp.nodeConnsLock.RLock()
@@ -474,8 +471,13 @@ func (cp *connectionProvider) getTendConns() []*connection {
 
 // getUpdatedEndpoints retrieves the updated server endpoints from the Aerospike cluster.
 func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
+	type idAndEndpoints struct {
+		id        uint64
+		endpoints map[uint64]*protos.ServerEndpointList
+	}
+
 	conns := cp.getTendConns()
-	endpointsChan := make(chan map[uint64]*protos.ServerEndpointList)
+	newClusterChan := make(chan *idAndEndpoints)
 	endpointsReq := &protos.ClusterNodeEndpointsRequest{ListenerName: cp.listenerName}
 	wg := sync.WaitGroup{}
 
@@ -492,7 +494,7 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 				logger.WarnContext(ctx, "failed to get cluster ID", slog.Any("error", err))
 			}
 
-			if !cp.checkAndSetClusterID(clusterID.GetId()) {
+			if clusterID.GetId() == cp.clusterID {
 				logger.DebugContext(
 					ctx,
 					"old cluster ID found, skipping connection discovery",
@@ -510,25 +512,32 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 				return
 			}
 
-			endpointsChan <- endpointsResp.Endpoints
+			newClusterChan <- &idAndEndpoints{
+				id:        clusterID.GetId(),
+				endpoints: endpointsResp.Endpoints,
+			}
 		}(conn)
 	}
 
 	go func() {
 		wg.Wait()
-		close(endpointsChan)
+		close(newClusterChan)
 	}()
 
 	// Stores the endpoints from the node with the largest view of the cluster
-	var maxTempEndpoints map[uint64]*protos.ServerEndpointList
-	for endpoints := range endpointsChan {
-		if maxTempEndpoints == nil || len(endpoints) > len(maxTempEndpoints) {
-			maxTempEndpoints = endpoints
-			cp.logger.DebugContext(ctx, "found new cluster ID", slog.Any("endpoints", maxTempEndpoints))
+	var largestNewCluster *idAndEndpoints
+	for cluster := range newClusterChan {
+		if largestNewCluster == nil || len(cluster.endpoints) > len(largestNewCluster.endpoints) {
+			largestNewCluster = cluster
+			cp.logger.DebugContext(ctx, "found new cluster ID", slog.Any("endpoints", largestNewCluster))
 		}
 	}
 
-	return maxTempEndpoints
+	if largestNewCluster != nil {
+		cp.clusterID = largestNewCluster.id
+	}
+
+	return largestNewCluster.endpoints
 }
 
 // Checks if the node connections need to be updated and updates them if necessary.
@@ -655,7 +664,7 @@ func (cp *connectionProvider) createGrpcConnFromEndpoints(
 			continue // TODO: Add logging and support for IPv6
 		}
 
-		conn, err := cp.createGrcpConn(endpointToHostPort(endpoint))
+		conn, err := cp.grpcConnFactory(endpointToHostPort(endpoint))
 
 		if err == nil {
 			return conn, nil
@@ -667,7 +676,7 @@ func (cp *connectionProvider) createGrpcConnFromEndpoints(
 
 // createGrcpConn creates a gRPC client connection to a host. This handles adding
 // credential and configuring tls.
-func (cp *connectionProvider) createGrcpConn(hostPort *HostPort) (grpcClientConn, error) {
+func createGrcpConn(cp *connectionProvider, hostPort *HostPort) (grpcClientConn, error) {
 	opts := []grpc.DialOption{}
 
 	if cp.tlsConfig == nil {
@@ -704,5 +713,5 @@ func (cp *connectionProvider) createConnFromEndpoints(endpoints *protos.ServerEn
 		return nil, err
 	}
 
-	return newConnection(conn), nil
+	return cp.connFactory(conn), nil
 }
