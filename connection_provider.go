@@ -535,9 +535,10 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 
 	if largestNewCluster != nil {
 		cp.clusterID = largestNewCluster.id
+		return largestNewCluster.endpoints
 	}
 
-	return largestNewCluster.endpoints
+	return nil
 }
 
 // Checks if the node connections need to be updated and updates them if necessary.

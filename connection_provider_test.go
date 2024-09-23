@@ -169,6 +169,10 @@ func TestGetSeedConn_FailSeedConnEmpty(t *testing.T) {
 
 	assert.Equal(t, errors.New("no seed connections found"), err)
 }
+
+func TestconnectToSeeds(t *testing.T) {
+}
+
 func TestUpdateClusterConns_NoNewClusterID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
