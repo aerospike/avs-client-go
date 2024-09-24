@@ -1091,7 +1091,7 @@ func TestConvertToFields(t *testing.T) {
 		sort.Slice(result, sortFunc(result))
 		sort.Slice(tc.expected, sortFunc(result))
 
-		for i, _ := range tc.expected {
+		for i := range tc.expected {
 			assert.EqualExportedValues(t, tc.expected[i], result[i])
 		}
 
@@ -1152,7 +1152,7 @@ func TestConvertFromFields(t *testing.T) {
 
 type unknownVectorType struct{}
 
-func (*unknownVectorType) isVector_Data() {}
+func (*unknownVectorType) isVector_Data() {} //nolint:revive,stylecheck // Grpc generated
 
 func TestConvertFromVector(t *testing.T) {
 	testCases := []struct {

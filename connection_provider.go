@@ -375,6 +375,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 						authErr = err
 						tokenLock.Unlock()
 						conn.close()
+
 						return
 					}
 
@@ -390,6 +391,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
 					grpcConn.Close()
+
 					return
 				}
 
@@ -475,8 +477,8 @@ func (cp *connectionProvider) getTendConns() []*connection {
 // getUpdatedEndpoints retrieves the updated server endpoints from the Aerospike cluster.
 func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint64]*protos.ServerEndpointList {
 	type idAndEndpoints struct {
-		id        uint64
 		endpoints map[uint64]*protos.ServerEndpointList
+		id        uint64
 	}
 
 	conns := cp.getTendConns()

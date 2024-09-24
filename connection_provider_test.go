@@ -20,12 +20,17 @@ func TestNewConnectionProvider_FailSeedsNil(t *testing.T) {
 	seeds := HostPortSlice{}
 	listenerName := "listener"
 	isLoadBalancer := false
-	tlsConfig := &tls.Config{}
-	var logger *slog.Logger
-	var token tokenManager
+	tlsConfig := &tls.Config{} //nolint:gosec // tests
+
+	var (
+		logger *slog.Logger
+		token  tokenManager
+	)
 
 	cp, err := newConnectionProvider(context.Background(), seeds, &listenerName, isLoadBalancer, token, tlsConfig, logger)
-	defer cp.Close()
+	if err == nil {
+		defer cp.Close()
+	}
 
 	assert.Nil(t, cp)
 	assert.Equal(t, err, errors.New("seeds cannot be nil or empty"))
@@ -44,8 +49,10 @@ func TestNewConnectionProvider_FailNoTLS(t *testing.T) {
 	listenerName := "listener"
 	isLoadBalancer := false
 
-	var tlsConfig *tls.Config
-	var logger *slog.Logger
+	var (
+		tlsConfig *tls.Config
+		logger    *slog.Logger
+	)
 
 	token := NewMocktokenManager(ctrl)
 
@@ -55,7 +62,9 @@ func TestNewConnectionProvider_FailNoTLS(t *testing.T) {
 		Return(true)
 
 	cp, err := newConnectionProvider(context.Background(), seeds, &listenerName, isLoadBalancer, token, tlsConfig, logger)
-	defer cp.Close()
+	if err == nil {
+		defer cp.Close()
+	}
 
 	assert.Nil(t, cp)
 	assert.Equal(t, err, errors.New("tlsConfig is required when username/password authentication"))
@@ -77,12 +86,16 @@ func TestNewConnectionProvider_FailConnectToSeedConns(t *testing.T) {
 	listenerName := "listener"
 	isLoadBalancer := false
 
-	var tlsConfig *tls.Config
-	var logger *slog.Logger
-	var token tokenManager
+	var (
+		tlsConfig *tls.Config
+		logger    *slog.Logger
+		token     tokenManager
+	)
 
 	cp, err := newConnectionProvider(ctx, seeds, &listenerName, isLoadBalancer, token, tlsConfig, logger)
-	defer cp.Close()
+	if err == nil {
+		defer cp.Close()
+	}
 
 	assert.Nil(t, cp)
 	assert.Equal(t, "failed to connect to seeds: context deadline exceeded", err.Error())
@@ -361,7 +374,7 @@ func TestUpdateClusterConns_NewClusterIDWithDIFFERENTNodeIDs(t *testing.T) {
 		logger:         slog.Default(),
 		nodeConns:      make(map[uint64]*connectionAndEndpoints),
 		seedConns:      []*connection{},
-		tlsConfig:      &tls.Config{},
+		tlsConfig:      &tls.Config{}, //nolint:gosec // tests
 		seeds:          HostPortSlice{},
 		nodeConnsLock:  &sync.RWMutex{},
 		tendInterval:   time.Second * 1,
@@ -610,7 +623,7 @@ func TestUpdateClusterConns_NewClusterIDWithSAMENodeIDs(t *testing.T) {
 	cp := &connectionProvider{
 		logger:         slog.Default(),
 		seedConns:      []*connection{},
-		tlsConfig:      &tls.Config{},
+		tlsConfig:      &tls.Config{}, //nolint:gosec // tests
 		seeds:          HostPortSlice{},
 		nodeConnsLock:  &sync.RWMutex{},
 		tendInterval:   time.Second * 1,

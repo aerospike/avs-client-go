@@ -22,11 +22,12 @@ const (
 	indexWaitDuration    = time.Millisecond * 100
 )
 const (
-	failedToInsertRecord      = "failed to insert record"
-	failedToGetRecord         = "failed to get record"
-	failedToDeleteRecord      = "failed to delete record"
-	failedToCheckRecordExists = "failed to check if record exists"
-	failedToCheckIsIndexed    = "failed to check if record is indexed"
+	failedToInsertRecord           = "failed to insert record"
+	failedToGetRecord              = "failed to get record"
+	failedToDeleteRecord           = "failed to delete record"
+	failedToCheckRecordExists      = "failed to check if record exists"
+	failedToCheckIsIndexed         = "failed to check if record is indexed"
+	failedToWaitForIndexCompletion = "failed to wait for index completion"
 )
 
 type connProvider interface {
@@ -91,6 +92,7 @@ func NewClient(
 	if err != nil {
 		grpcToken.Close()
 		logger.Error("failed to create connection provider", slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
 	}
 
@@ -651,11 +653,11 @@ func (c *Client) WaitForIndexCompletion(
 	waitInterval time.Duration,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
-	logger.DebugContext(ctx, "waiting for index completion")
+	logger.DebugContext(ctx, failedToWaitForIndexCompletion)
 
 	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
-		msg := "failed to wait for index completion"
+		msg := failedToWaitForIndexCompletion
 		logger.Error(msg, slog.Any("error", err))
 
 		return NewAVSError(msg, err)
@@ -672,7 +674,7 @@ func (c *Client) WaitForIndexCompletion(
 	for {
 		indexStatus, err := conn.indexClient.GetStatus(ctx, indexStatusReq)
 		if err != nil {
-			msg := "failed to wait for index completion"
+			msg := failedToWaitForIndexCompletion
 			logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 			return NewAVSError(msg, err)
@@ -702,7 +704,9 @@ func (c *Client) WaitForIndexCompletion(
 		case <-timer.C:
 		case <-ctx.Done():
 			msg := "failed to wait for index completion"
+
 			logger.ErrorContext(ctx, "waiting for index completion canceled")
+
 			return NewAVSError(msg, ctx.Err())
 		}
 	}

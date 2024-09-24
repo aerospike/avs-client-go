@@ -27,7 +27,7 @@ func TestRefreshToken_Success(t *testing.T) {
 		authClient: mockAuthServiceClient,
 	}
 
-	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjMwMDAwMDAwMDAsImlhdCI6MTcyNzExMDc1NH0.GD01CEWxW6-7lHcyeetM95WKdUlwY85m5lFqzcTCtzs"
+	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjMwMDAwMDAwMDAsImlhdCI6MTcyNzExMDc1NH0.GD01CEWxW6-7lHcyeetM95WKdUlwY85m5lFqzcTCtzs" //nolint:gosec,lll // tests
 
 	// Set up expectations for AuthServiceClient.Authenticate()
 	mockAuthServiceClient.
@@ -168,7 +168,7 @@ func TestRefreshToken_FailedInvalidJson(t *testing.T) {
 		authClient: mockAuthServiceClient,
 	}
 
-	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjMwMDAwMDAwMDAsImlhdCI6MTcyNzExMD.GD01CEWxW6-7lHcyeetM95WKdUlwY85m5lFqzcTCtzs"
+	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjMwMDAwMDAwMDAsImlhdCI6MTcyNzExMD.GD01CEWxW6-7lHcyeetM95WKdUlwY85m5lFqzcTCtzs" //nolint:gosec,lll // tests
 
 	// Set up expectations for AuthServiceClient.Authenticate()
 	mockAuthServiceClient.
@@ -205,7 +205,7 @@ func TestRefreshToken_FailedFindExp(t *testing.T) {
 		authClient: mockAuthServiceClient,
 	}
 
-	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJpYXQiOjE3MjcxMTA3NTR9.50IZcLoS7mQPzQsKvJZyXNUukvT5FdiqN2tynNIjHuk"
+	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJpYXQiOjE3MjcxMTA3NTR9.50IZcLoS7mQPzQsKvJZyXNUukvT5FdiqN2tynNIjHuk" //nolint:gosec,lll // tests
 
 	// Set up expectations for AuthServiceClient.Authenticate()
 	mockAuthServiceClient.
@@ -242,7 +242,7 @@ func TestRefreshToken_FailedFindIat(t *testing.T) {
 		authClient: mockAuthServiceClient,
 	}
 
-	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjMwMDAwMDAwMDB9.f5DtjF1sYLH6fz0ThcFKxwngIXkVMLnhJtIrjLi_1p0"
+	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjMwMDAwMDAwMDB9.f5DtjF1sYLH6fz0ThcFKxwngIXkVMLnhJtIrjLi_1p0" //nolint:gosec,lll // tests
 
 	// Set up expectations for AuthServiceClient.Authenticate()
 	mockAuthServiceClient.
@@ -279,7 +279,7 @@ func TestRefreshToken_FailedTtlLessThan0(t *testing.T) {
 		authClient: mockAuthServiceClient,
 	}
 
-	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjE3MjcxMTA3NTMsImlhdCI6MTcyNzExMDc1NH0.YdH5twU6-LGLtgvD2sktiw1j40MRUe_r4oPN565z4Ok"
+	b64token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJleHAiOjE3MjcxMTA3NTMsImlhdCI6MTcyNzExMDc1NH0.YdH5twU6-LGLtgvD2sktiw1j40MRUe_r4oPN565z4Ok" //nolint:gosec,lll // tests
 
 	// Set up expectations for AuthServiceClient.Authenticate()
 	mockAuthServiceClient.
