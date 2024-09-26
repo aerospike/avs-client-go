@@ -1566,7 +1566,7 @@ func TestWaitForIndexCompletion_FailTimeout(t *testing.T) {
 
 	var avsError *Error
 	assert.ErrorAs(t, err, &avsError)
-	assert.Equal(t, avsError, NewAVSError("failed to wait for index completion", fmt.Errorf("context deadline exceeded")))
+	assert.Equal(t, avsError, NewAVSError("waiting for index completion canceled", fmt.Errorf("context deadline exceeded")))
 }
 
 func TestIndexCreateFromIndexDef_Success(t *testing.T) {
