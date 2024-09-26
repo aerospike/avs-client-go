@@ -653,7 +653,7 @@ func (c *Client) WaitForIndexCompletion(
 	waitInterval time.Duration,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
-	logger.DebugContext(ctx, failedToWaitForIndexCompletion)
+	logger.DebugContext(ctx, "waiting for index completion")
 
 	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
@@ -703,9 +703,9 @@ func (c *Client) WaitForIndexCompletion(
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
-			msg := "failed to wait for index completion"
+			msg := "waiting for index completion canceled"
 
-			logger.ErrorContext(ctx, "waiting for index completion canceled")
+			logger.ErrorContext(ctx, msg)
 
 			return NewAVSError(msg, ctx.Err())
 		}

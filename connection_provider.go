@@ -530,11 +530,19 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 	}()
 
 	// Stores the endpoints from the node with the largest view of the cluster
+	// Think about a scenario where the nodes are split into two cluster
+	// momentarily and the client can see both. We are making the decision here
+	// to connect to the larger of the two formed cluster.
 	var largestNewCluster *idAndEndpoints
 	for cluster := range newClusterChan {
 		if largestNewCluster == nil || len(cluster.endpoints) > len(largestNewCluster.endpoints) {
 			largestNewCluster = cluster
-			cp.logger.DebugContext(ctx, "found new cluster ID", slog.Any("endpoints", largestNewCluster))
+			cp.logger.DebugContext(
+				ctx,
+				"largest cluster with new id",
+				slog.Any("endpoints", largestNewCluster.endpoints),
+				slog.Uint64("id", largestNewCluster.id),
+			)
 		}
 	}
 

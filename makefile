@@ -66,5 +66,5 @@ view-coverage: $(COVERAGE_DIR)/total.cov
 	go tool cover -html=$(COVERAGE_DIR)/total.cov
 
 PHONY: lint
-lint: $(GOLANGCI_LINT)
+lint: $(GOLANGCI_LINT) mocks
 	$(GOLANGCI_LINT) run
