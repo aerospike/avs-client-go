@@ -5,7 +5,7 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 GOLANGCI_LINT ?= $(GOBIN)/golangci-lint
-GOLANGCI_LINT_VERSION ?= v1.54.0
+GOLANGCI_LINT_VERSION ?= v1.58.0
 
 MOCKGEN ?= $(GOBIN)/mockgen
 MOCKGEN_VERSION ?= v0.3.0

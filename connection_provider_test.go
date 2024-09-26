@@ -212,7 +212,7 @@ func TestConnectToSeeds_FailedFailedToCreateConnection(t *testing.T) {
 		isLoadBalancer: true,
 		closed:         atomic.Bool{},
 		logger:         slog.Default(),
-		grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+		grpcConnFactory: func(_ *HostPort) (grpcClientConn, error) {
 			return nil, fmt.Errorf("foo")
 		},
 	}
@@ -243,10 +243,10 @@ func TestConnectToSeeds_FailedToRefreshToken(t *testing.T) {
 		isLoadBalancer: true,
 		closed:         atomic.Bool{},
 		logger:         slog.Default(),
-		grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+		grpcConnFactory: func(_ *HostPort) (grpcClientConn, error) {
 			return nil, nil
 		},
-		connFactory: func(conn grpcClientConn) *connection {
+		connFactory: func(_ grpcClientConn) *connection {
 			return &connection{}
 		},
 		token: mockToken,
