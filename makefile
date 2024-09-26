@@ -45,7 +45,7 @@ mocks: get-mockgen
 test: unit integration 
 
 .PHONY: integration
-integration: $(GOLEAK)
+integration:
 	mkdir -p $(COV_INTEGRATION_DIR) || true
 	go test -tags=integration -timeout 30m -cover ./... -args -test.gocoverdir=$(COV_INTEGRATION_DIR) 
 

@@ -72,32 +72,8 @@ func (suite *ServerTestBaseSuite) TearDownSuite() {
 	goleak.VerifyNone(suite.T())
 }
 
-func GetStrPtr(str string) *string {
-	ptr := str
-	return &ptr
-}
-
-func GetUint32Ptr(i int) *uint32 {
-	ptr := uint32(i)
-	return &ptr
-}
-
-func GetUint64Ptr(i int) *uint64 {
-	ptr := uint64(i)
-	return &ptr
-}
-
-func GetFloat32Ptr(i float32) *float32 {
-	ptr := float32(i)
-	return &ptr
-}
-
-func GetBoolPtr(b bool) *bool {
-	return &b
-}
-
-func GetTimePtr(t time.Time) *time.Time {
-	return &t
+func Ptr[T any](value T) *T {
+	return &value
 }
 
 func CreateFlagStr(name, value string) string {
@@ -253,12 +229,12 @@ func (idb *IndexDefinitionBuilder) Build() *protos.IndexDefinition {
 		},
 		Params: &protos.IndexDefinition_HnswParams{
 			HnswParams: &protos.HnswParams{
-				M:              GetUint32Ptr(16),
-				EfConstruction: GetUint32Ptr(100),
-				Ef:             GetUint32Ptr(100),
+				M:              Ptr(uint32(16)),
+				EfConstruction: Ptr(uint32(100)),
+				Ef:             Ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxRecords: GetUint32Ptr(100000),
-					Interval:   GetUint32Ptr(30000),
+					MaxRecords: Ptr(uint32(100000)),
+					Interval:   Ptr(uint32(30000)),
 				},
 				CachingParams: &protos.HnswCachingParams{},
 				HealerParams:  &protos.HnswHealerParams{},
@@ -349,7 +325,7 @@ func DockerComposeUp(composeFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "-lDEBUG", "compose", fmt.Sprintf("-f%s", composeFile), "up", "-d")
+	cmd := exec.CommandContext(ctx, "docker", "-lDEBUG", "compose", fmt.Sprintf("-f%s", composeFile), "--env-file", "docker/.env", "up", "-d")
 	err := cmd.Run()
 	cmd.Wait()
 

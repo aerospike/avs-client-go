@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func GetStrPtr(str string) *string {
+func Ptr(str string) *string {
 	ptr := str
 	return &ptr
 }
@@ -22,7 +22,7 @@ func TestConvertToKey(t *testing.T) {
 			input: "testString",
 			expected: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_StringValue{
 					StringValue: "testString",
 				},
@@ -32,7 +32,7 @@ func TestConvertToKey(t *testing.T) {
 			input: []byte{0x01, 0x02, 0x03},
 			expected: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_BytesValue{
 					BytesValue: []byte{0x01, 0x02, 0x03},
 				},
@@ -42,7 +42,7 @@ func TestConvertToKey(t *testing.T) {
 			input: int32(123),
 			expected: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_IntValue{
 					IntValue: 123,
 				},
@@ -52,7 +52,7 @@ func TestConvertToKey(t *testing.T) {
 			input: int64(123456789),
 			expected: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_LongValue{
 					LongValue: 123456789,
 				},
@@ -62,7 +62,7 @@ func TestConvertToKey(t *testing.T) {
 			input: int(123456789),
 			expected: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_LongValue{
 					LongValue: 123456789,
 				},
@@ -76,7 +76,7 @@ func TestConvertToKey(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result, err := ConvertToKey("testNamespace", GetStrPtr("testSet"), tc.input)
+		result, err := ConvertToKey("testNamespace", Ptr("testSet"), tc.input)
 
 		assert.Equal(t, tc.expected, result)
 		assert.Equal(t, tc.expectedErr, err)
@@ -98,59 +98,59 @@ func TestConvertFromKey(t *testing.T) {
 		{
 			input: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_StringValue{
 					StringValue: "testString",
 				},
 			},
 			expectedNamespace: "testNamespace",
-			expectedSet:       GetStrPtr("testSet"),
+			expectedSet:       Ptr("testSet"),
 			expectedKey:       "testString",
 		},
 		{
 			input: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_BytesValue{
 					BytesValue: []byte{0x01, 0x02, 0x03},
 				},
 			},
 			expectedNamespace: "testNamespace",
-			expectedSet:       GetStrPtr("testSet"),
+			expectedSet:       Ptr("testSet"),
 			expectedKey:       []byte{0x01, 0x02, 0x03},
 		},
 		{
 			input: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_IntValue{
 					IntValue: 123,
 				},
 			},
 			expectedNamespace: "testNamespace",
-			expectedSet:       GetStrPtr("testSet"),
+			expectedSet:       Ptr("testSet"),
 			expectedKey:       int32(123),
 		},
 		{
 			input: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value: &Key_LongValue{
 					LongValue: 123456789,
 				},
 			},
 			expectedNamespace: "testNamespace",
-			expectedSet:       GetStrPtr("testSet"),
+			expectedSet:       Ptr("testSet"),
 			expectedKey:       int64(123456789),
 		},
 		{
 			input: &Key{
 				Namespace: "testNamespace",
-				Set:       GetStrPtr("testSet"),
+				Set:       Ptr("testSet"),
 				Value:     &keyUnknown{},
 			},
 			expectedNamespace: "testNamespace",
-			expectedSet:       GetStrPtr("testSet"),
+			expectedSet:       Ptr("testSet"),
 			expectedKey:       nil, // Unsupported or nil input
 			expectedErr:       fmt.Errorf("unsupported key value type: *protos.keyUnknown"),
 		},
@@ -614,12 +614,12 @@ func TestConvertToMapValue(t *testing.T) {
 		{
 			input:       map[int]any{10: struct{}{}},
 			expected:    nil,
-			expectedErr: GetStrPtr("unsupported map value: unsupported value type: struct {}"),
+			expectedErr: Ptr("unsupported map value: unsupported value type: struct {}"),
 		},
 		{
 			input:       map[any]any{struct{}{}: 10},
 			expected:    nil,
-			expectedErr: GetStrPtr("unsupported map key: unsupported key type: struct {}"),
+			expectedErr: Ptr("unsupported map key: unsupported key type: struct {}"),
 		},
 	}
 
@@ -694,7 +694,7 @@ func TestConvertToList(t *testing.T) {
 		{
 			input:       []any{struct{}{}},
 			expected:    nil,
-			expectedErr: GetStrPtr("unsupported list value: unsupported value type: struct {}"),
+			expectedErr: Ptr("unsupported list value: unsupported value type: struct {}"),
 		},
 	}
 
@@ -775,7 +775,7 @@ func TestConvertFromListValue(t *testing.T) {
 				},
 			},
 			expected:    nil,
-			expectedErr: GetStrPtr("unsupported list value: unsupported value type: *protos.valueUnknown"),
+			expectedErr: Ptr("unsupported list value: unsupported value type: *protos.valueUnknown"),
 		},
 	}
 
@@ -870,7 +870,7 @@ func TestConvertFromMapValue(t *testing.T) {
 				},
 			},
 			expected:    nilMap,
-			expectedErr: GetStrPtr("unsupported map key value type: *protos.mapKeyValueUnknown"),
+			expectedErr: Ptr("unsupported map key value type: *protos.mapKeyValueUnknown"),
 		},
 		{
 			input: &Map{
@@ -888,7 +888,7 @@ func TestConvertFromMapValue(t *testing.T) {
 				},
 			},
 			expected:    nilMap,
-			expectedErr: GetStrPtr("unsupported map value: unsupported value type: *protos.valueUnknown"),
+			expectedErr: Ptr("unsupported map value: unsupported value type: *protos.valueUnknown"),
 		},
 	}
 

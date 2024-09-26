@@ -283,8 +283,8 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 			&IndexCreateOpts{
 				Sets: []string{"testset"},
 				Storage: &protos.IndexStorage{
-					Namespace: GetStrPtr("storage-ns"),
-					Set:       GetStrPtr("storage-set"),
+					Namespace: Ptr("storage-ns"),
+					Set:       Ptr("storage-set"),
 				},
 				Labels: map[string]string{
 					"a": "b",
@@ -298,11 +298,11 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
 				Type:                 protos.IndexType_HNSW,
-				SetFilter:            GetStrPtr("testset"),
+				SetFilter:            Ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
-					Namespace: GetStrPtr("storage-ns"),
-					Set:       GetStrPtr("storage-set"),
+					Namespace: Ptr("storage-ns"),
+					Set:       Ptr("storage-set"),
 				},
 				Labels: map[string]string{
 					"a": "b",
@@ -362,8 +362,8 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 			opts: &IndexCreateOpts{
 				Sets: []string{"testset"},
 				Storage: &protos.IndexStorage{
-					Namespace: GetStrPtr("storage-ns"),
-					Set:       GetStrPtr("storage-set"),
+					Namespace: Ptr("storage-ns"),
+					Set:       Ptr("storage-set"),
 				},
 				Labels: map[string]string{
 					"a": "b",
@@ -379,11 +379,11 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
 				Type:                 protos.IndexType_HNSW,
-				SetFilter:            GetStrPtr("testset"),
+				SetFilter:            Ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
-					Namespace: GetStrPtr("storage-ns"),
-					Set:       GetStrPtr("storage-set"),
+					Namespace: Ptr("storage-ns"),
+					Set:       Ptr("storage-set"),
 				},
 				Labels: map[string]string{
 					"a": "b",
@@ -403,33 +403,33 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 			opts: &IndexCreateOpts{
 				Sets: []string{"testset"},
 				Storage: &protos.IndexStorage{
-					Namespace: GetStrPtr("storage-ns"),
-					Set:       GetStrPtr("storage-set"),
+					Namespace: Ptr("storage-ns"),
+					Set:       Ptr("storage-set"),
 				},
 				Labels: map[string]string{
 					"a": "b",
 				},
 			},
 			updateHnsw: &protos.HnswIndexUpdate{
-				MaxMemQueueSize: GetUint32Ptr(100),
+				MaxMemQueueSize: Ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxRecords: GetUint32Ptr(10_001),
-					Interval:   GetUint32Ptr(10_002),
+					MaxRecords: Ptr(uint32(10_001)),
+					Interval:   Ptr(uint32(10_002)),
 				},
 				CachingParams: &protos.HnswCachingParams{
-					MaxEntries: GetUint64Ptr(10_003),
-					Expiry:     GetUint64Ptr(10_004),
+					MaxEntries: Ptr(uint64(10_003)),
+					Expiry:     Ptr(uint64(10_004)),
 				},
 				HealerParams: &protos.HnswHealerParams{
-					MaxScanRatePerNode: GetUint32Ptr(10_005),
-					MaxScanPageSize:    GetUint32Ptr(10_006),
-					ReindexPercent:     GetFloat32Ptr(51),
-					Schedule:           GetStrPtr("0 0 0 25 12 ?"),
-					Parallelism:        GetUint32Ptr(1),
+					MaxScanRatePerNode: Ptr(uint32(10_005)),
+					MaxScanPageSize:    Ptr(uint32(10_006)),
+					ReindexPercent:     Ptr(float32(51)),
+					Schedule:           Ptr("0 0 0 25 12 ?"),
+					Parallelism:        Ptr(uint32(1)),
 				},
 				MergeParams: &protos.HnswIndexMergeParams{
-					IndexParallelism:   GetUint32Ptr(2),
-					ReIndexParallelism: GetUint32Ptr(3),
+					IndexParallelism:   Ptr(uint32(2)),
+					ReIndexParallelism: Ptr(uint32(3)),
 				},
 			},
 			updateLabels: map[string]string{
@@ -443,11 +443,11 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
 				Type:                 protos.IndexType_HNSW,
-				SetFilter:            GetStrPtr("testset"),
+				SetFilter:            Ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
-					Namespace: GetStrPtr("storage-ns"),
-					Set:       GetStrPtr("storage-set"),
+					Namespace: Ptr("storage-ns"),
+					Set:       Ptr("storage-set"),
 				},
 				Labels: map[string]string{
 					"a": "b",
@@ -455,25 +455,25 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				},
 				Params: &protos.IndexDefinition_HnswParams{
 					HnswParams: &protos.HnswParams{
-						MaxMemQueueSize: GetUint32Ptr(100),
+						MaxMemQueueSize: Ptr(uint32(100)),
 						BatchingParams: &protos.HnswBatchingParams{
-							MaxRecords: GetUint32Ptr(10_001),
-							Interval:   GetUint32Ptr(10_002),
+							MaxRecords: Ptr(uint32(10_001)),
+							Interval:   Ptr(uint32(10_002)),
 						},
 						CachingParams: &protos.HnswCachingParams{
-							MaxEntries: GetUint64Ptr(10_003),
-							Expiry:     GetUint64Ptr(10_004),
+							MaxEntries: Ptr(uint64(10_003)),
+							Expiry:     Ptr(uint64(10_004)),
 						},
 						HealerParams: &protos.HnswHealerParams{
-							MaxScanRatePerNode: GetUint32Ptr(10_005),
-							MaxScanPageSize:    GetUint32Ptr(10_006),
-							ReindexPercent:     GetFloat32Ptr(51),
-							Schedule:           GetStrPtr("0 0 0 25 12 ?"),
-							Parallelism:        GetUint32Ptr(1),
+							MaxScanRatePerNode: Ptr(uint32(10_005)),
+							MaxScanPageSize:    Ptr(uint32(10_006)),
+							ReindexPercent:     Ptr(float32(51)),
+							Schedule:           Ptr("0 0 0 25 12 ?"),
+							Parallelism:        Ptr(uint32(1)),
 						},
 						MergeParams: &protos.HnswIndexMergeParams{
-							IndexParallelism:   GetUint32Ptr(2),
-							ReIndexParallelism: GetUint32Ptr(3),
+							IndexParallelism:   Ptr(uint32(2)),
+							ReIndexParallelism: Ptr(uint32(3)),
 						},
 					},
 				},
@@ -1187,7 +1187,7 @@ func (suite *SingleNodeTestSuite) TestConnectedNodeEndpoint() {
 			nodeId: &protos.NodeId{
 				Id: 1,
 			},
-			expectedErrMsg: GetStrPtr("failed to get connected endpoint"),
+			expectedErrMsg: Ptr("failed to get connected endpoint"),
 		},
 	}
 
@@ -1225,7 +1225,7 @@ func (suite *SingleNodeTestSuite) TestClusteringState() {
 			nodeId: &protos.NodeId{
 				Id: 1,
 			},
-			expectedErrMsg: GetStrPtr("failed to get clustering state"),
+			expectedErrMsg: Ptr("failed to get clustering state"),
 		},
 	}
 
@@ -1274,7 +1274,7 @@ func (suite *SingleNodeTestSuite) TestClusterEndpoints() {
 			nodeId: &protos.NodeId{
 				Id: 1,
 			},
-			expectedErrMsg: GetStrPtr("failed to get cluster endpoints"),
+			expectedErrMsg: Ptr("failed to get cluster endpoints"),
 		},
 	}
 
@@ -1323,7 +1323,7 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 			nodeId: &protos.NodeId{
 				Id: 1,
 			},
-			expectedErrMsg: GetStrPtr("failed to make about request"),
+			expectedErrMsg: Ptr("failed to make about request"),
 		},
 	}
 

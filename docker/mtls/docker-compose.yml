@@ -16,7 +16,7 @@ services:
       timeout: 20s
       retries: 20
   avs:
-    image: aerospike/aerospike-vector-search:0.10.0
+    image: ${AVS_IMAGE:-"AVS_IMAGE env not set"}
     depends_on:
       aerospike:
         condition: service_healthy

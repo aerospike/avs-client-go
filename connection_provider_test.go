@@ -246,10 +246,8 @@ func TestConnectToSeeds_FailedToRefreshToken(t *testing.T) {
 		grpcConnFactory: func(_ *HostPort) (grpcClientConn, error) {
 			return nil, nil
 		},
-		connFactory: func(_ grpcClientConn) *connection {
-			return &connection{}
-		},
-		token: mockToken,
+		connFactory: newConnection,
+		token:       mockToken,
 	}
 
 	cp.seeds = HostPortSlice{

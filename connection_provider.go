@@ -65,7 +65,7 @@ func newConnection(conn grpcClientConn) *connection {
 }
 
 func (conn *connection) close() error {
-	if conn.grpcConn != nil {
+	if conn != nil && conn.grpcConn != nil {
 		return conn.grpcConn.Close()
 	}
 
@@ -104,8 +104,8 @@ type connectionProvider struct {
 	token           tokenManager
 	stopTendChan    chan struct{}
 	closed          atomic.Bool
-	grpcConnFactory func(hostPort *HostPort) (grpcClientConn, error) // For testing
-	connFactory     func(conn grpcClientConn) *connection            // For testing
+	grpcConnFactory func(hostPort *HostPort) (grpcClientConn, error)
+	connFactory     func(conn grpcClientConn) *connection
 }
 
 // newConnectionProvider creates a new connectionProvider instance.
@@ -362,7 +362,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 			}
 
 			extraCheck := true
-			conn := cp.connFactory(grpcConn)
+			conn := newConnection(grpcConn)
 
 			if cp.token != nil {
 				// Only one thread needs to refresh the token. Only first will
@@ -374,7 +374,11 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
 						authErr = err
 						tokenLock.Unlock()
-						conn.close()
+
+						err = conn.close()
+						if err != nil {
+							logger.WarnContext(ctx, "failed to close connection", slog.Any("error", err))
+						}
 
 						return
 					}
@@ -390,7 +394,11 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 				about, err := conn.aboutClient.Get(ctx, &protos.AboutRequest{})
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
-					grpcConn.Close()
+
+					err = conn.close()
+					if err != nil {
+						logger.WarnContext(ctx, "failed to close connection", slog.Any("error", err))
+					}
 
 					return
 				}
@@ -537,16 +545,16 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 	for cluster := range newClusterChan {
 		if largestNewCluster == nil || len(cluster.endpoints) > len(largestNewCluster.endpoints) {
 			largestNewCluster = cluster
-			cp.logger.DebugContext(
-				ctx,
-				"largest cluster with new id",
-				slog.Any("endpoints", largestNewCluster.endpoints),
-				slog.Uint64("id", largestNewCluster.id),
-			)
 		}
 	}
 
 	if largestNewCluster != nil {
+		cp.logger.DebugContext(
+			ctx,
+			"largest cluster with new id",
+			slog.Any("endpoints", largestNewCluster.endpoints),
+			slog.Uint64("id", largestNewCluster.id),
+		)
 		cp.clusterID = largestNewCluster.id
 		return largestNewCluster.endpoints
 	}
@@ -605,7 +613,7 @@ func (cp *connectionProvider) checkAndSetNodeConns(
 }
 
 // removeDownNodes removes the gRPC client connections for nodes in nodeConns
-// that aren't apart of newNodeEndpoints
+// that aren't a part of newNodeEndpoints
 func (cp *connectionProvider) removeDownNodes(newNodeEndpoints map[uint64]*protos.ServerEndpointList) {
 	cp.nodeConnsLock.Lock()
 	defer cp.nodeConnsLock.Unlock()
