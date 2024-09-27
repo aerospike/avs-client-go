@@ -16,6 +16,7 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/goleak"
 	"golang.org/x/net/context"
 )
 
@@ -67,21 +68,12 @@ func (suite *ServerTestBaseSuite) TearDownSuite() {
 	if err != nil {
 		fmt.Println("unable to stop docker compose down")
 	}
+
+	goleak.VerifyNone(suite.T())
 }
 
-func GetStrPtr(str string) *string {
-	ptr := str
-	return &ptr
-}
-
-func GetUint32Ptr(i int) *uint32 {
-	ptr := uint32(i)
-	return &ptr
-}
-
-func GetBoolPtr(b bool) *bool {
-	ptr := b
-	return &ptr
+func Ptr[T any](value T) *T {
+	return &value
 }
 
 func CreateFlagStr(name, value string) string {
@@ -237,12 +229,12 @@ func (idb *IndexDefinitionBuilder) Build() *protos.IndexDefinition {
 		},
 		Params: &protos.IndexDefinition_HnswParams{
 			HnswParams: &protos.HnswParams{
-				M:              GetUint32Ptr(16),
-				EfConstruction: GetUint32Ptr(100),
-				Ef:             GetUint32Ptr(100),
+				M:              Ptr(uint32(16)),
+				EfConstruction: Ptr(uint32(100)),
+				Ef:             Ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxRecords: GetUint32Ptr(100000),
-					Interval:   GetUint32Ptr(30000),
+					MaxRecords: Ptr(uint32(100000)),
+					Interval:   Ptr(uint32(30000)),
 				},
 				CachingParams: &protos.HnswCachingParams{},
 				HealerParams:  &protos.HnswHealerParams{},
@@ -333,7 +325,7 @@ func DockerComposeUp(composeFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "-lDEBUG", "compose", fmt.Sprintf("-f%s", composeFile), "up", "-d")
+	cmd := exec.CommandContext(ctx, "docker", "-lDEBUG", "compose", fmt.Sprintf("-f%s", composeFile), "--env-file", "docker/.env", "up", "-d")
 	err := cmd.Run()
 	cmd.Wait()
 

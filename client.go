@@ -22,17 +22,27 @@ const (
 	indexWaitDuration    = time.Millisecond * 100
 )
 const (
-	failedToInsertRecord      = "failed to insert record"
-	failedToGetRecord         = "failed to get record"
-	failedToDeleteRecord      = "failed to delete record"
-	failedToCheckRecordExists = "failed to check if record exists"
-	failedToCheckIsIndexed    = "failed to check if record exists"
+	failedToInsertRecord           = "failed to insert record"
+	failedToGetRecord              = "failed to get record"
+	failedToDeleteRecord           = "failed to delete record"
+	failedToCheckRecordExists      = "failed to check if record exists"
+	failedToCheckIsIndexed         = "failed to check if record is indexed"
+	failedToWaitForIndexCompletion = "failed to wait for index completion"
 )
+
+type connProvider interface {
+	GetNodeIDs() []uint64
+	GetRandomConn() (*connection, error)
+	GetSeedConn() (*connection, error)
+	GetNodeConn(id uint64) (*connection, error)
+	Close() error
+}
 
 // Client is a client for managing Aerospike Vector Indexes.
 type Client struct {
-	logger          *slog.Logger
-	channelProvider *channelProvider
+	logger             *slog.Logger
+	connectionProvider connProvider
+	token              tokenManager
 }
 
 // NewClient creates a new Client instance.
@@ -64,23 +74,40 @@ func NewClient(
 	logger = logger.WithGroup("avs")
 	logger.Info("creating new client")
 
-	channelProvider, err := newChannelProvider(
+	var grpcToken tokenManager
+
+	if credentials != nil {
+		grpcToken = newGrpcJWTToken(credentials.username, credentials.password, logger)
+	}
+
+	connectionProvider, err := newConnectionProvider(
 		ctx,
 		seeds,
 		listenerName,
 		isLoadBalancer,
-		credentials,
+		grpcToken,
 		tlsConfig,
 		logger,
 	)
 	if err != nil {
-		logger.Error("failed to create channel provider", slog.Any("error", err))
+		grpcToken.Close()
+		logger.Error("failed to create connection provider", slog.Any("error", err))
+
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
 	}
 
+	return newClient(connectionProvider, grpcToken, logger)
+}
+
+func newClient(
+	connectionProvider connProvider,
+	token tokenManager,
+	logger *slog.Logger,
+) (*Client, error) {
 	return &Client{
-		logger:          logger,
-		channelProvider: channelProvider,
+		logger:             logger,
+		token:              token,
+		connectionProvider: connectionProvider,
 	}, nil
 }
 
@@ -91,7 +118,12 @@ func NewClient(
 //	error: An error if the closure fails, otherwise nil.
 func (c *Client) Close() error {
 	c.logger.Info("Closing client")
-	return c.channelProvider.Close()
+
+	if c.token != nil {
+		c.token.Close()
+	}
+
+	return c.connectionProvider.Close()
 }
 
 func (c *Client) put(
@@ -108,7 +140,7 @@ func (c *Client) put(
 		slog.Any("key", key),
 	)
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		logger.Error(failedToInsertRecord, slog.Any("error", err))
 		return NewAVSError(failedToInsertRecord, err)
@@ -259,7 +291,7 @@ func (c *Client) Get(ctx context.Context,
 	)
 	logger.DebugContext(ctx, "getting record")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		logger.Error(failedToGetRecord, slog.Any("error", err))
 		return nil, NewAVSError(failedToGetRecord, err)
@@ -306,7 +338,7 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 	)
 	logger.DebugContext(ctx, "deleting record")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		logger.Error(failedToDeleteRecord, slog.Any("error", err))
 		return NewAVSError(failedToDeleteRecord, err)
@@ -314,8 +346,8 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 
 	protoKey, err := protos.ConvertToKey(namespace, set, key)
 	if err != nil {
-		logger.Error(failedToInsertRecord, slog.Any("error", err))
-		return NewAVSError(failedToInsertRecord, err)
+		logger.Error(failedToDeleteRecord, slog.Any("error", err))
+		return NewAVSError(failedToDeleteRecord, err)
 	}
 
 	getReq := &protos.DeleteRequest{
@@ -325,7 +357,7 @@ func (c *Client) Delete(ctx context.Context, namespace string, set *string, key 
 	_, err = conn.transactClient.Delete(ctx, getReq)
 	if err != nil {
 		logger.Error(failedToDeleteRecord, slog.Any("error", err))
-		return NewAVSErrorFromGrpc(failedToGetRecord, err)
+		return NewAVSErrorFromGrpc(failedToDeleteRecord, err)
 	}
 
 	return nil
@@ -356,7 +388,7 @@ func (c *Client) Exists(
 	)
 	logger.DebugContext(ctx, "checking if record exists")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		logger.Error(failedToCheckRecordExists, slog.Any("error", err))
 		return false, NewAVSError(failedToCheckRecordExists, err)
@@ -409,7 +441,7 @@ func (c *Client) IsIndexed(
 	)
 	logger.DebugContext(ctx, "checking if record is indexed")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		logger.Error(failedToCheckIsIndexed, slog.Any("error", err))
 		return false, NewAVSError(failedToCheckIsIndexed, err)
@@ -422,6 +454,10 @@ func (c *Client) IsIndexed(
 	}
 
 	isIndexedReq := &protos.IsIndexedRequest{
+		IndexId: &protos.IndexId{
+			Namespace: namespace,
+			Name:      indexName,
+		},
 		Key: protoKey,
 	}
 
@@ -449,7 +485,7 @@ func (c *Client) vectorSearch(ctx context.Context,
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "searching for vector")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to search for vector"
 		logger.Error(msg, slog.Any("error", err))
@@ -619,10 +655,12 @@ func (c *Client) WaitForIndexCompletion(
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "waiting for index completion")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
-		logger.Error("failed to wait for index completion", slog.Any("error", err))
-		return err
+		msg := failedToWaitForIndexCompletion
+		logger.Error(msg, slog.Any("error", err))
+
+		return NewAVSError(msg, err)
 	}
 
 	indexStatusReq := createIndexStatusRequest(namespace, indexName)
@@ -636,8 +674,10 @@ func (c *Client) WaitForIndexCompletion(
 	for {
 		indexStatus, err := conn.indexClient.GetStatus(ctx, indexStatusReq)
 		if err != nil {
-			logger.ErrorContext(ctx, "failed to wait for index completion", slog.Any("error", err))
-			return err
+			msg := failedToWaitForIndexCompletion
+			logger.ErrorContext(ctx, msg, slog.Any("error", err))
+
+			return NewAVSError(msg, err)
 		}
 
 		// We consider the index completed when unmerged record count == 0 for
@@ -655,7 +695,7 @@ func (c *Client) WaitForIndexCompletion(
 		} else {
 			logger.DebugContext(ctx, "index not yet completed", slog.Int64("unmerged", unmerged))
 
-			unmergedNotZeroCount--
+			unmergedNotZeroCount++
 		}
 
 		timer.Reset(waitInterval)
@@ -663,8 +703,11 @@ func (c *Client) WaitForIndexCompletion(
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
-			logger.ErrorContext(ctx, "waiting for index completion canceled")
-			return ctx.Err()
+			msg := "waiting for index completion canceled"
+
+			logger.ErrorContext(ctx, msg)
+
+			return NewAVSError(msg, ctx.Err())
 		}
 	}
 }
@@ -771,7 +814,7 @@ func (c *Client) IndexCreateFromIndexDef(
 	logger := c.logger.With(slog.Any("definition", indexDef))
 	logger.DebugContext(ctx, "creating index from definition")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to create index from definition"
 		logger.Error(msg, slog.Any("error", err))
@@ -785,7 +828,7 @@ func (c *Client) IndexCreateFromIndexDef(
 
 	_, err = conn.indexClient.Create(ctx, indexCreateReq)
 	if err != nil {
-		msg := "failed to create index"
+		msg := "failed to create index from definition"
 		logger.Error(msg, slog.Any("error", err))
 
 		return NewAVSErrorFromGrpc(msg, err)
@@ -804,7 +847,7 @@ func (c *Client) IndexCreateFromIndexDef(
 //	ctx (context.Context): The context for the operation.
 //	namespace (string): The namespace of the index.
 //	name (string): The name of the index.
-//	metadata (map[string]string): Metadata to update on the index.
+//	labels (map[string]string): Labels to update on the index.
 //	hnswParams (*protos.HnswIndexUpdate): The HNSW parameters to update.
 //
 // Returns:
@@ -814,14 +857,14 @@ func (c *Client) IndexUpdate(
 	ctx context.Context,
 	namespace string,
 	indexName string,
-	metadata map[string]string,
+	labels map[string]string,
 	hnswParams *protos.HnswIndexUpdate,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
 	logger.DebugContext(ctx, "updating index")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to update index"
 		logger.Error(msg, slog.Any("error", err))
@@ -834,7 +877,7 @@ func (c *Client) IndexUpdate(
 			Namespace: namespace,
 			Name:      indexName,
 		},
-		Labels: metadata,
+		Labels: labels,
 		Update: &protos.IndexUpdateRequest_HnswIndexUpdate{
 			HnswIndexUpdate: hnswParams,
 		},
@@ -866,7 +909,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, indexName string) err
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "dropping index")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to drop index"
 		logger.Error(msg, slog.Any("error", err))
@@ -909,7 +952,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, indexName string) err
 func (c *Client) IndexList(ctx context.Context, applyDefaults bool) (*protos.IndexDefinitionList, error) {
 	c.logger.DebugContext(ctx, "listing indexes")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get indexes"
 
@@ -956,7 +999,7 @@ func (c *Client) IndexGet(
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "getting index")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get index"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -999,7 +1042,7 @@ func (c *Client) IndexGetStatus(ctx context.Context, namespace, indexName string
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 	logger.DebugContext(ctx, "getting index status")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get index status"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1041,7 +1084,7 @@ func (c *Client) GcInvalidVertices(ctx context.Context, namespace, indexName str
 
 	logger.DebugContext(ctx, "garbage collection invalid vertices")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to garbage collect invalid vertices"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1084,7 +1127,7 @@ func (c *Client) CreateUser(ctx context.Context, username, password string, role
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.DebugContext(ctx, "creating user")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to create user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1123,7 +1166,7 @@ func (c *Client) UpdateCredentials(ctx context.Context, username, password strin
 	logger := c.logger.With(slog.String("username", username))
 	logger.DebugContext(ctx, "updating user credentials")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to update user credentials"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1160,7 +1203,7 @@ func (c *Client) DropUser(ctx context.Context, username string) error {
 	logger := c.logger.With(slog.String("username", username))
 	logger.DebugContext(ctx, "dropping user")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to drop user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1198,7 +1241,7 @@ func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, er
 	logger := c.logger.With(slog.String("username", username))
 	logger.DebugContext(ctx, "getting user")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to get user"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1234,7 +1277,7 @@ func (c *Client) GetUser(ctx context.Context, username string) (*protos.User, er
 func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, error) {
 	c.logger.DebugContext(ctx, "listing users")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to list users"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1244,7 +1287,7 @@ func (c *Client) ListUsers(ctx context.Context) (*protos.ListUsersResponse, erro
 
 	usersResp, err := conn.userAdminClient.ListUsers(ctx, &emptypb.Empty{})
 	if err != nil {
-		msg := "failed to lists users"
+		msg := "failed to list users"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
@@ -1268,7 +1311,7 @@ func (c *Client) GrantRoles(ctx context.Context, username string, roles []string
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.DebugContext(ctx, "granting user roles")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to grant user roles"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1307,7 +1350,7 @@ func (c *Client) RevokeRoles(ctx context.Context, username string, roles []strin
 	logger := c.logger.With(slog.String("username", username), slog.Any("roles", roles))
 	logger.DebugContext(ctx, "revoking user roles")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to revoke user roles"
 		logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1344,7 +1387,7 @@ func (c *Client) RevokeRoles(ctx context.Context, username string, roles []strin
 func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, error) {
 	c.logger.DebugContext(ctx, "listing roles")
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to list roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
@@ -1354,7 +1397,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 
 	rolesResp, err := conn.userAdminClient.ListRoles(ctx, &emptypb.Empty{})
 	if err != nil {
-		msg := "failed to lists roles"
+		msg := "failed to list roles"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc(msg, err)
@@ -1364,6 +1407,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 }
 
 // NodeIDs returns a list of all the node IDs that the client is connected to.
+// If load-balancer is set true no NodeIDs will be returned.
 // If a node is accessible but not a part of the cluster it will not be
 // returned.
 //
@@ -1377,7 +1421,7 @@ func (c *Client) ListRoles(ctx context.Context) (*protos.ListRolesResponse, erro
 func (c *Client) NodeIDs(ctx context.Context) []*protos.NodeId {
 	c.logger.DebugContext(ctx, "getting cluster info")
 
-	ids := c.channelProvider.GetNodeIDs()
+	ids := c.connectionProvider.GetNodeIDs()
 	nodeIDs := make([]*protos.NodeId, len(ids))
 
 	for i, id := range ids {
@@ -1451,7 +1495,7 @@ func (c *Client) ClusteringState(ctx context.Context, nodeID *protos.NodeId) (*p
 
 	conn, err := c.getConnection(nodeID)
 	if err != nil {
-		msg := "failed to list roles"
+		msg := "failed to get clustering state"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
 		return nil, NewAVSError(msg, err)
@@ -1529,7 +1573,7 @@ func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.Abou
 		msg := "failed to make about request"
 		c.logger.ErrorContext(ctx, msg, slog.Any("error", err))
 
-		return nil, NewAVSErrorFromGrpc(msg, err)
+		return nil, NewAVSError(msg, err)
 	}
 
 	resp, err := conn.aboutClient.Get(ctx, &protos.AboutRequest{})
@@ -1545,10 +1589,10 @@ func (c *Client) About(ctx context.Context, nodeID *protos.NodeId) (*protos.Abou
 
 func (c *Client) getConnection(nodeID *protos.NodeId) (*connection, error) {
 	if nodeID == nil {
-		return c.channelProvider.GetSeedConn()
+		return c.connectionProvider.GetSeedConn()
 	}
 
-	return c.channelProvider.GetNodeConn(nodeID.GetId())
+	return c.connectionProvider.GetNodeConn(nodeID.GetId())
 }
 
 // waitForIndexCreation waits for an index to be created and blocks until it is.
@@ -1560,7 +1604,7 @@ func (c *Client) waitForIndexCreation(ctx context.Context,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to wait for index creation"
 		logger.Error(msg, slog.Any("error", err))
@@ -1611,7 +1655,7 @@ func (c *Client) waitForIndexCreation(ctx context.Context,
 func (c *Client) waitForIndexDrop(ctx context.Context, namespace, indexName string, waitInterval time.Duration) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
-	conn, err := c.channelProvider.GetRandomConn()
+	conn, err := c.connectionProvider.GetRandomConn()
 	if err != nil {
 		msg := "failed to wait for index deletion"
 		logger.Error(msg, slog.Any("error", err))

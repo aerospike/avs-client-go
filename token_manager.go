@@ -15,11 +15,11 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// tokenManager is responsible for managing authentication tokens and refreshing
+// grpcTokenManager is responsible for managing authentication tokens and refreshing
 // them when necessary.
 //
 //nolint:govet // We will favor readability over field alignment
-type tokenManager struct {
+type grpcTokenManager struct {
 	username         string
 	password         string
 	token            atomic.Value
@@ -29,13 +29,13 @@ type tokenManager struct {
 	refreshScheduled bool
 }
 
-// newJWTToken creates a new tokenManager instance with the provided username, password, and logger.
-func newJWTToken(username, password string, logger *slog.Logger) *tokenManager {
+// newGrpcJWTToken creates a new tokenManager instance with the provided username, password, and logger.
+func newGrpcJWTToken(username, password string, logger *slog.Logger) *grpcTokenManager {
 	logger.WithGroup("jwt")
 
 	logger.Debug("creating new token manager")
 
-	return &tokenManager{
+	return &grpcTokenManager{
 		username:        username,
 		password:        password,
 		logger:          logger,
@@ -44,7 +44,7 @@ func newJWTToken(username, password string, logger *slog.Logger) *tokenManager {
 }
 
 // Close stops the scheduled token refresh and closes the token manager.
-func (tm *tokenManager) Close() {
+func (tm *grpcTokenManager) Close() {
 	if tm.refreshScheduled {
 		tm.logger.Debug("stopping scheduled token refresh")
 		tm.stopRefreshChan <- struct{}{}
@@ -55,17 +55,16 @@ func (tm *tokenManager) Close() {
 }
 
 // setRefreshTimeFromTTL sets the refresh time based on the provided time-to-live (TTL) duration.
-func (tm *tokenManager) setRefreshTimeFromTTL(ttl time.Duration) {
+func (tm *grpcTokenManager) setRefreshTimeFromTTL(ttl time.Duration) {
 	tm.refreshTime.Store(time.Now().Add(ttl))
 }
 
 // RefreshToken refreshes the authentication token using the provided gRPC client connection.
 // It returns a boolean indicating if the token was successfully refreshed and
 // an error if any. It is not thread safe.
-func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnInterface) error {
+func (tm *grpcTokenManager) RefreshToken(ctx context.Context, conn *connection) error {
 	// We only want one goroutine to refresh the token at a time
-	client := protos.NewAuthServiceClient(conn)
-	resp, err := client.Authenticate(ctx, &protos.AuthRequest{
+	resp, err := conn.authClient.Authenticate(ctx, &protos.AuthRequest{
 		Credentials: createUserPassCredential(tm.username, tm.password),
 	})
 
@@ -74,6 +73,11 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 	}
 
 	claims := strings.Split(resp.GetToken(), ".")
+
+	if len(claims) < 3 {
+		return fmt.Errorf("failed to authenticate: missing either header, payload, or signature")
+	}
+
 	decClaims, err := base64.RawURLEncoding.DecodeString(claims[1])
 
 	if err != nil {
@@ -89,17 +93,17 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 
 	expiryToken, ok := tokenMap["exp"].(float64)
 	if !ok {
-		return fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("failed to authenticate: unable to find exp in token")
 	}
 
 	iat, ok := tokenMap["iat"].(float64)
 	if !ok {
-		return fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("failed to authenticate: unable to find iat in token")
 	}
 
 	ttl := time.Duration(expiryToken-iat) * time.Second
 	if ttl <= 0 {
-		return fmt.Errorf("%s: %w", "failed to authenticate", err)
+		return fmt.Errorf("failed to authenticate: jwt ttl is less than 0")
 	}
 
 	tm.logger.DebugContext(
@@ -120,7 +124,7 @@ func (tm *tokenManager) RefreshToken(ctx context.Context, conn grpc.ClientConnIn
 // ScheduleRefresh schedules the token refresh using the provided function to
 // get the gRPC client connection. This is not threadsafe. It should only be
 // called once.
-func (tm *tokenManager) ScheduleRefresh(getConn func() (*connection, error)) {
+func (tm *grpcTokenManager) ScheduleRefresh(getConn func() (*connection, error)) {
 	if tm.refreshScheduled {
 		tm.logger.Warn("refresh already scheduled")
 	}
@@ -139,7 +143,7 @@ func (tm *tokenManager) ScheduleRefresh(getConn func() (*connection, error)) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-			err = tm.RefreshToken(ctx, connClients.grpcConn)
+			err = tm.RefreshToken(ctx, connClients)
 			if err != nil {
 				tm.logger.Warn("failed to refresh token", slog.Any("error", err))
 			}
@@ -167,12 +171,12 @@ func (tm *tokenManager) ScheduleRefresh(getConn func() (*connection, error)) {
 }
 
 // RequireTransportSecurity returns true to indicate that transport security is required.
-func (tm *tokenManager) RequireTransportSecurity() bool {
+func (tm *grpcTokenManager) RequireTransportSecurity() bool {
 	return true
 }
 
 // UnaryInterceptor returns the grpc unary client interceptor that attaches the token to outgoing requests.
-func (tm *tokenManager) UnaryInterceptor() grpc.UnaryClientInterceptor {
+func (tm *grpcTokenManager) UnaryInterceptor() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
 		method string,
@@ -186,7 +190,7 @@ func (tm *tokenManager) UnaryInterceptor() grpc.UnaryClientInterceptor {
 }
 
 // StreamInterceptor returns the grpc stream client interceptor that attaches the token to outgoing requests.
-func (tm *tokenManager) StreamInterceptor() grpc.StreamClientInterceptor {
+func (tm *grpcTokenManager) StreamInterceptor() grpc.StreamClientInterceptor {
 	return func(
 		ctx context.Context,
 		desc *grpc.StreamDesc,
@@ -200,7 +204,7 @@ func (tm *tokenManager) StreamInterceptor() grpc.StreamClientInterceptor {
 }
 
 // attachToken attaches the authentication token to the outgoing context.
-func (tm *tokenManager) attachToken(ctx context.Context) context.Context {
+func (tm *grpcTokenManager) attachToken(ctx context.Context) context.Context {
 	rawToken := tm.token.Load()
 	if rawToken == nil {
 		return ctx

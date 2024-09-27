@@ -16,8 +16,7 @@ services:
       timeout: 20s
       retries: 20
   avs:
-    image: aerospike.jfrog.io/docker/aerospike/aerospike-vector-
-search-private:0.9.1-SNAPSHOT
+    image: ${AVS_IMAGE:-"AVS_IMAGE env not set"}
     depends_on:
       aerospike:
         condition: service_healthy
