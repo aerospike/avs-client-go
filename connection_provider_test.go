@@ -349,9 +349,6 @@ func TestUpdateClusterConns_NewClusterIDWithDIFFERENTNodeIDs(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	// mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
-	// mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
-
 	mockClusterInfoClient1111 := protos.NewMockClusterInfoServiceClient(ctrl)
 	mockClusterInfoClient2222 := protos.NewMockClusterInfoServiceClient(ctrl)
 
@@ -613,9 +610,6 @@ func TestUpdateClusterConns_NewClusterIDWithSAMENodeIDs(t *testing.T) {
 				},
 			},
 		}, nil)
-
-	// mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
-	// mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
 
 	mockClusterInfoClient1111 := protos.NewMockClusterInfoServiceClient(ctrl)
 	mockClusterInfoClient2222 := protos.NewMockClusterInfoServiceClient(ctrl)
