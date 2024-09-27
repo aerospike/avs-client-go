@@ -212,7 +212,7 @@ func TestConnectToSeeds_FailedFailedToCreateConnection(t *testing.T) {
 		isLoadBalancer: true,
 		closed:         atomic.Bool{},
 		logger:         slog.Default(),
-		grpcConnFactory: func(_ *HostPort) (grpcClientConn, error) {
+		connFactory: func(_ *HostPort) (*connection, error) {
 			return nil, fmt.Errorf("foo")
 		},
 	}
@@ -243,11 +243,11 @@ func TestConnectToSeeds_FailedToRefreshToken(t *testing.T) {
 		isLoadBalancer: true,
 		closed:         atomic.Bool{},
 		logger:         slog.Default(),
-		grpcConnFactory: func(_ *HostPort) (grpcClientConn, error) {
+		connFactory: func(_ *HostPort) (*connection, error) {
 			return nil, nil
 		},
-		connFactory: newConnection,
-		token:       mockToken,
+		// connFactory: newConnection,
+		token: mockToken,
 	}
 
 	cp.seeds = HostPortSlice{
@@ -349,8 +349,8 @@ func TestUpdateClusterConns_NewClusterIDWithDIFFERENTNodeIDs(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
-	mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
+	// mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
+	// mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
 
 	mockClusterInfoClient1111 := protos.NewMockClusterInfoServiceClient(ctrl)
 	mockClusterInfoClient2222 := protos.NewMockClusterInfoServiceClient(ctrl)
@@ -382,30 +382,45 @@ func TestUpdateClusterConns_NewClusterIDWithDIFFERENTNodeIDs(t *testing.T) {
 		token:          nil,
 		stopTendChan:   make(chan struct{}),
 		closed:         atomic.Bool{},
-		grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+		connFactory: func(hostPort *HostPort) (*connection, error) {
 			if hostPort.String() == "1.1.1.1:3000" {
-				return mockNewGrpcConn1111, nil
+				return &connection{
+					clusterInfoClient: mockClusterInfoClient1111,
+					aboutClient:       mockAboutClient1111,
+				}, nil
 			} else if hostPort.String() == "2.2.2.2:3000" {
-				return mockNewGrpcConn2222, nil
+				return &connection{
+					clusterInfoClient: mockClusterInfoClient2222,
+					aboutClient:       mockAboutClient2222,
+				}, nil
 			}
 
 			return nil, fmt.Errorf("foo")
 		},
-		connFactory: func(grpcConn grpcClientConn) *connection {
-			if grpcConn == mockNewGrpcConn1111 {
-				return &connection{
-					clusterInfoClient: mockClusterInfoClient1111,
-					aboutClient:       mockAboutClient1111,
-				}
-			} else if grpcConn == mockNewGrpcConn2222 {
-				return &connection{
-					clusterInfoClient: mockClusterInfoClient2222,
-					aboutClient:       mockAboutClient2222,
-				}
-			}
+		// grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+		// 	if hostPort.String() == "1.1.1.1:3000" {
+		// 		return mockNewGrpcConn1111, nil
+		// 	} else if hostPort.String() == "2.2.2.2:3000" {
+		// 		return mockNewGrpcConn2222, nil
+		// 	}
 
-			return nil
-		},
+		// 	return nil, fmt.Errorf("foo")
+		// },
+		// connFactory: func(grpcConn grpcClientConn) *connection {
+		// 	if grpcConn == mockNewGrpcConn1111 {
+		// 		return &connection{
+		// 			clusterInfoClient: mockClusterInfoClient1111,
+		// 			aboutClient:       mockAboutClient1111,
+		// 		}
+		// 	} else if grpcConn == mockNewGrpcConn2222 {
+		// 		return &connection{
+		// 			clusterInfoClient: mockClusterInfoClient2222,
+		// 			aboutClient:       mockAboutClient2222,
+		// 		}
+		// 	}
+
+		// 	return nil
+		// },
 	}
 
 	cp.logger = cp.logger.With(slog.String("test", "TestUpdateClusterConns_NewClusterID"))
@@ -599,8 +614,8 @@ func TestUpdateClusterConns_NewClusterIDWithSAMENodeIDs(t *testing.T) {
 			},
 		}, nil)
 
-	mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
-	mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
+	// mockNewGrpcConn1111 := NewMockgrpcClientConn(ctrl)
+	// mockNewGrpcConn2222 := NewMockgrpcClientConn(ctrl)
 
 	mockClusterInfoClient1111 := protos.NewMockClusterInfoServiceClient(ctrl)
 	mockClusterInfoClient2222 := protos.NewMockClusterInfoServiceClient(ctrl)
@@ -631,30 +646,45 @@ func TestUpdateClusterConns_NewClusterIDWithSAMENodeIDs(t *testing.T) {
 		token:          nil,
 		stopTendChan:   make(chan struct{}),
 		closed:         atomic.Bool{},
-		grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+		connFactory: func(hostPort *HostPort) (*connection, error) {
 			if hostPort.String() == "1.1.1.1:3000" {
-				return mockNewGrpcConn1111, nil
+				return &connection{
+					clusterInfoClient: mockClusterInfoClient1111,
+					aboutClient:       mockAboutClient1111,
+				}, nil
 			} else if hostPort.String() == "2.2.2.2:3000" {
-				return mockNewGrpcConn2222, nil
+				return &connection{
+					clusterInfoClient: mockClusterInfoClient2222,
+					aboutClient:       mockAboutClient2222,
+				}, nil
 			}
 
 			return nil, fmt.Errorf("foo")
 		},
-		connFactory: func(grpcConn grpcClientConn) *connection {
-			if grpcConn == mockNewGrpcConn1111 {
-				return &connection{
-					clusterInfoClient: mockClusterInfoClient1111,
-					aboutClient:       mockAboutClient1111,
-				}
-			} else if grpcConn == mockNewGrpcConn2222 {
-				return &connection{
-					clusterInfoClient: mockClusterInfoClient2222,
-					aboutClient:       mockAboutClient2222,
-				}
-			}
+		// grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
+		// 	if hostPort.String() == "1.1.1.1:3000" {
+		// 		return mockNewGrpcConn1111, nil
+		// 	} else if hostPort.String() == "2.2.2.2:3000" {
+		// 		return mockNewGrpcConn2222, nil
+		// 	}
 
-			return nil
-		},
+		// 	return nil, fmt.Errorf("foo")
+		// },
+		// connFactory: func(grpcConn grpcClientConn) *connection {
+		// 	if grpcConn == mockNewGrpcConn1111 {
+		// 		return &connection{
+		// 			clusterInfoClient: mockClusterInfoClient1111,
+		// 			aboutClient:       mockAboutClient1111,
+		// 		}
+		// 	} else if grpcConn == mockNewGrpcConn2222 {
+		// 		return &connection{
+		// 			clusterInfoClient: mockClusterInfoClient2222,
+		// 			aboutClient:       mockAboutClient2222,
+		// 		}
+		// 	}
+
+		// 	return nil
+		// },
 		// Existing node connections. These will be replaced after a new cluster is found.
 		nodeConns: map[uint64]*connectionAndEndpoints{
 			1: {
