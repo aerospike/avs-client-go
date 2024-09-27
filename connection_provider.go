@@ -555,7 +555,9 @@ func (cp *connectionProvider) getUpdatedEndpoints(ctx context.Context) map[uint6
 			slog.Any("endpoints", largestNewCluster.endpoints),
 			slog.Uint64("id", largestNewCluster.id),
 		)
+
 		cp.clusterID = largestNewCluster.id
+
 		return largestNewCluster.endpoints
 	}
 
