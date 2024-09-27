@@ -246,7 +246,6 @@ func TestConnectToSeeds_FailedToRefreshToken(t *testing.T) {
 		connFactory: func(_ *HostPort) (*connection, error) {
 			return nil, nil
 		},
-		// connFactory: newConnection,
 		token: mockToken,
 	}
 
@@ -394,30 +393,6 @@ func TestUpdateClusterConns_NewClusterIDWithDIFFERENTNodeIDs(t *testing.T) {
 
 			return nil, fmt.Errorf("foo")
 		},
-		// grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
-		// 	if hostPort.String() == "1.1.1.1:3000" {
-		// 		return mockNewGrpcConn1111, nil
-		// 	} else if hostPort.String() == "2.2.2.2:3000" {
-		// 		return mockNewGrpcConn2222, nil
-		// 	}
-
-		// 	return nil, fmt.Errorf("foo")
-		// },
-		// connFactory: func(grpcConn grpcClientConn) *connection {
-		// 	if grpcConn == mockNewGrpcConn1111 {
-		// 		return &connection{
-		// 			clusterInfoClient: mockClusterInfoClient1111,
-		// 			aboutClient:       mockAboutClient1111,
-		// 		}
-		// 	} else if grpcConn == mockNewGrpcConn2222 {
-		// 		return &connection{
-		// 			clusterInfoClient: mockClusterInfoClient2222,
-		// 			aboutClient:       mockAboutClient2222,
-		// 		}
-		// 	}
-
-		// 	return nil
-		// },
 	}
 
 	cp.logger = cp.logger.With(slog.String("test", "TestUpdateClusterConns_NewClusterID"))
@@ -655,30 +630,7 @@ func TestUpdateClusterConns_NewClusterIDWithSAMENodeIDs(t *testing.T) {
 
 			return nil, fmt.Errorf("foo")
 		},
-		// grpcConnFactory: func(hostPort *HostPort) (grpcClientConn, error) {
-		// 	if hostPort.String() == "1.1.1.1:3000" {
-		// 		return mockNewGrpcConn1111, nil
-		// 	} else if hostPort.String() == "2.2.2.2:3000" {
-		// 		return mockNewGrpcConn2222, nil
-		// 	}
 
-		// 	return nil, fmt.Errorf("foo")
-		// },
-		// connFactory: func(grpcConn grpcClientConn) *connection {
-		// 	if grpcConn == mockNewGrpcConn1111 {
-		// 		return &connection{
-		// 			clusterInfoClient: mockClusterInfoClient1111,
-		// 			aboutClient:       mockAboutClient1111,
-		// 		}
-		// 	} else if grpcConn == mockNewGrpcConn2222 {
-		// 		return &connection{
-		// 			clusterInfoClient: mockClusterInfoClient2222,
-		// 			aboutClient:       mockAboutClient2222,
-		// 		}
-		// 	}
-
-		// 	return nil
-		// },
 		// Existing node connections. These will be replaced after a new cluster is found.
 		nodeConns: map[uint64]*connectionAndEndpoints{
 			1: {

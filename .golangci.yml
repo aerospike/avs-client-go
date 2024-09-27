@@ -80,7 +80,7 @@ issues:
         - goconst # Test code is allowed to have constants
     - path: 'connection_provider_test.go'
       linters:
-        - goconst # Test cod
+        - goconst
 #     - path: dir/sample\.go
 #       linters:
 #       - lll # Test code is allowed to have long lines

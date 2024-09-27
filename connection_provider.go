@@ -104,8 +104,7 @@ type connectionProvider struct {
 	token          tokenManager
 	stopTendChan   chan struct{}
 	closed         atomic.Bool
-	// grpcConnFactory func(hostPort *HostPort) (grpcClientConn, error)
-	connFactory func(hostPort *HostPort) (*connection, error)
+	connFactory    func(hostPort *HostPort) (*connection, error)
 }
 
 // newConnectionProvider creates a new connectionProvider instance.
