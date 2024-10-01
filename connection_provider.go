@@ -343,8 +343,8 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 	}
 
 	var authErr error
-	authErrOnce := sync.Once{}
 
+	authErrOnce := sync.Once{}
 	wg := sync.WaitGroup{}
 	seedConns := make(chan *connection)
 	cp.seedConns = []*connection{}
