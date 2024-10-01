@@ -98,7 +98,11 @@ func TestNewConnectionProvider_FailConnectToSeedConns(t *testing.T) {
 	}
 
 	assert.Nil(t, cp)
-	assert.Equal(t, "failed to connect to seeds: context deadline exceeded", err.Error())
+	assert.Equal(
+		t,
+		"failed to connect to seeds: context deadline exceeded",
+		err.Error(),
+	)
 }
 
 func TestClose_FailsToCloseConns(t *testing.T) {

@@ -344,6 +344,7 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 
 	var authErr error
 
+	authErrOnce := sync.Once{}
 	wg := sync.WaitGroup{}
 	seedConns := make(chan *connection)
 	cp.seedConns = []*connection{}
@@ -373,7 +374,8 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 					err := cp.token.RefreshToken(ctx, conn)
 					if err != nil {
 						logger.WarnContext(ctx, "failed to refresh token", slog.Any("error", err))
-						authErr = err
+
+						authErrOnce.Do(func() { authErr = err })
 						tokenLock.Unlock()
 
 						err = conn.close()
@@ -395,6 +397,8 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 				about, err := conn.aboutClient.Get(ctx, &protos.AboutRequest{})
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
+
+					authErrOnce.Do(func() { authErr = err })
 
 					err = conn.close()
 					if err != nil {
@@ -425,12 +429,13 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 	if len(cp.seedConns) == 0 {
 		msg := "failed to connect to seeds"
 
-		if authErr != nil {
-			return NewAVSErrorFromGrpc(msg, authErr)
-		}
-
 		if err := ctx.Err(); err != nil {
 			msg = fmt.Sprintf("%s: %s", msg, err)
+			return NewAVSError(msg, nil)
+		}
+
+		if authErr != nil {
+			return NewAVSErrorFromGrpc(msg, authErr)
 		}
 
 		return NewAVSError(msg, nil)
