@@ -947,6 +947,7 @@ func (c *Client) IndexDrop(ctx context.Context, namespace, indexName string) err
 // Args:
 //
 //	ctx (context.Context): The context for the operation.
+//	applyDefaults (bool): Whether to apply server default values to the index definitions.
 //
 // Returns:
 //

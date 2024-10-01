@@ -18,7 +18,7 @@ performing vector searches with an Aerospike cluster.
 To install the Aerospike Vector Search Go Client, use the following command:
 
 ```bash
-go get github.com/aerospike/aerospike-vector-search-go-client
+go get github.com/aerospike/avs-client-go
 ```
 
 ## Example Usage
@@ -41,12 +41,20 @@ func main() {
 	connectCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	hostPort := NewHostPort("127.0.0.1", 5000)
+	credentials := NewCredentialsFromUserPass("admin", "admin")
 
-	adminClient, err := avs.NewAdminClient(
+	var (
+		listenerName *string
+		tlsConfig *tls.Config
+	)
+
+	client, err := avs.NewClient(
 		connectCtx,
 		HostPortSlice{hostPort},
-		nil,
-		true,
+		listenerName,
+		true
+		credentials
+		tlsConfig,
 		logger,
 	)
 	cancel()
@@ -57,26 +65,25 @@ func main() {
 	}
 
 	logger.Info("successfully connected to server")
-	defer adminClient.Close()
+	defer client.Close()
 
 	namespace := "test"
-	set := "testset"
 	indexName := "bookIndex"
 	vectorField := "vector"
-	dimensions := 10
+	dimensions := uint32(10)
 	distanceMetric := protos.VectorDistanceMetric_MANHATTAN
+	indexOpts := &IndexCreateOpts{
+		Set: []string{"testset"}
+	}
 
-	err = adminClient.IndexCreate(
+	err = client.IndexCreate(
 		context.Background(),
 		namespace,
-		[]string{set},
 		indexName,
 		vectorField,
-		uint32(dimensions),
+		dimensions,
 		distanceMetric,
-		nil,
-		nil,
-		nil,
+		indexOpts,
 	)
 	if err != nil {
 		logger.Error("failed to create index", slog.Any("error", err))
@@ -85,7 +92,7 @@ func main() {
 
 	logger.Info("successfully created index")
 
-	indexes, err := adminClient.IndexList(context.Background())
+	indexes, err := client.IndexList(context.Background(), true)
 	if err != nil {
 		logger.Error("failed to list indexes", slog.Any("error", err))
 		return
@@ -95,7 +102,7 @@ func main() {
 		fmt.Println(index.String())
 	}
 
-	err = adminClient.IndexDrop(context.Background(), namespace, indexName)
+	err = client.IndexDrop(context.Background(), namespace, indexName)
 	if err != nil {
 		logger.Error("failed to drop index", slog.Any("error", err))
 		return
