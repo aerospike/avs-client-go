@@ -30,16 +30,31 @@ $(MOCKGEN): $(GOBIN)
 	go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION)
 
 .PHONY: mocks
-mocks: get-mockgen
-	$(MOCKGEN) --source client.go --destination client_mock.go --package avs
-	$(MOCKGEN) --source connection_provider.go --destination connection_provider_mock.go --package avs
-	$(MOCKGEN) --source protos/auth_grpc.pb.go --destination protos/auth_grpc_mock.pb.go --package protos
-	$(MOCKGEN) --source protos/index_grpc.pb.go --destination protos/index_grpc_mock.pb.go --package protos
-	$(MOCKGEN) --source protos/transact_grpc.pb.go --destination protos/transact_grpc_mock.pb.go --package protos
-	$(MOCKGEN) --source protos/types.pb.go --destination protos/types_mock.pb.go --package protos
-	$(MOCKGEN) --source protos/user-admin_grpc.pb.go --destination protos/user-admin_grpc_mock.pb.go --package protos
-	$(MOCKGEN) --source protos/vector-db_grpc.pb.go --destination protos/vector-db_grpc_mock.pb.go --package protos
+mocks: $(MOCKGEN) $(ROOT_DIR)/client_mock.go $(ROOT_DIR)/connection_provider_mock.go $(PROTO_DIR)/auth_grpc_mock.pb.go $(PROTO_DIR)/index_grpc_mock.pb.go $(PROTO_DIR)/transact_grpc_mock.pb.go $(PROTO_DIR)/types_mock.pb.go $(PROTO_DIR)/user-admin_grpc_mock.pb.go $(PROTO_DIR)/vector-db_grpc_mock.pb.go
 
+$(ROOT_DIR)/client_mock.go: $(ROOT_DIR)/client.go
+	$(MOCKGEN) --source $< --destination $@ --package avs
+
+$(ROOT_DIR)/connection_provider_mock.go: $(ROOT_DIR)/connection_provider.go
+	$(MOCKGEN) --source $< --destination $@ --package avs
+
+$(PROTO_DIR)/auth_grpc_mock.pb.go: $(PROTO_DIR)/auth_grpc.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
+
+$(PROTO_DIR)/index_grpc_mock.pb.go: $(PROTO_DIR)/index_grpc.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
+
+$(PROTO_DIR)/transact_grpc_mock.pb.go: $(PROTO_DIR)/transact_grpc.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
+
+$(PROTO_DIR)/types_mock.pb.go: $(PROTO_DIR)/types.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
+
+$(PROTO_DIR)/user-admin_grpc_mock.pb.go: $(PROTO_DIR)/user-admin_grpc.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
+
+$(PROTO_DIR)/vector-db_grpc_mock.pb.go: $(PROTO_DIR)/vector-db_grpc.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
 
 .PHONY: test
 test: unit integration 
