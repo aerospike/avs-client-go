@@ -396,6 +396,8 @@ func (cp *connectionProvider) connectToSeeds(ctx context.Context) error {
 				if err != nil {
 					logger.WarnContext(ctx, "failed to connect to seed", slog.Any("error", err))
 
+					authErr = err
+
 					err = conn.close()
 					if err != nil {
 						logger.WarnContext(ctx, "failed to close connection", slog.Any("error", err))

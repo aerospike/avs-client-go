@@ -90,7 +90,10 @@ func NewClient(
 		logger,
 	)
 	if err != nil {
-		grpcToken.Close()
+		if grpcToken != nil {
+			grpcToken.Close()
+		}
+
 		logger.Error("failed to create connection provider", slog.Any("error", err))
 
 		return nil, NewAVSErrorFromGrpc("failed to connect to server", err)
