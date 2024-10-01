@@ -39,9 +39,10 @@ import (
 
 func main() {
 	connectCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	hostPort := NewHostPort("127.0.0.1", 5000)
+	loadBalancer := true
 	credentials := NewCredentialsFromUserPass("admin", "admin")
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	var (
 		listenerName *string
@@ -52,7 +53,7 @@ func main() {
 		connectCtx,
 		HostPortSlice{hostPort},
 		listenerName,
-		true
+		loadBalancer,
 		credentials
 		tlsConfig,
 		logger,
