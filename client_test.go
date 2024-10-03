@@ -1036,7 +1036,7 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 		Limit: 7,
 		SearchParams: &protos.VectorSearchRequest_HnswSearchParams{
 			HnswSearchParams: &protos.HnswSearchParams{
-				Ef: Ptr(uint32(8)),
+				Ef: ptr(uint32(8)),
 			},
 		},
 		Projection: &protos.ProjectionSpec{
@@ -1073,7 +1073,7 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 				return &protos.Neighbor{
 					Key: &protos.Key{
 						Namespace: "testNamespace",
-						Set:       Ptr("testSet"),
+						Set:       ptr("testSet"),
 						Value: &protos.Key_StringValue{
 							StringValue: fmt.Sprintf("key-%d", vectorCounter),
 						},
@@ -1108,9 +1108,9 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 					"field1": "value1",
 				},
 				Generation: uint32(1),
-				Expiration: Ptr(AerospikeEpoch.Add(time.Second * 1)),
+				Expiration: ptr(AerospikeEpoch.Add(time.Second * 1)),
 			},
-			Set:       Ptr("testSet"),
+			Set:       ptr("testSet"),
 			Key:       "key-1",
 			Namespace: "testNamespace",
 			Distance:  float32(1),
@@ -1121,9 +1121,9 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 					"field1": "value1",
 				},
 				Generation: uint32(2),
-				Expiration: Ptr(AerospikeEpoch.Add(time.Second * 2)),
+				Expiration: ptr(AerospikeEpoch.Add(time.Second * 2)),
 			},
-			Set:       Ptr("testSet"),
+			Set:       ptr("testSet"),
 			Key:       "key-2",
 			Namespace: "testNamespace",
 			Distance:  float32(2),
@@ -1134,9 +1134,9 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 					"field1": "value1",
 				},
 				Generation: uint32(3),
-				Expiration: Ptr(AerospikeEpoch.Add(time.Second * 3)),
+				Expiration: ptr(AerospikeEpoch.Add(time.Second * 3)),
 			},
-			Set:       Ptr("testSet"),
+			Set:       ptr("testSet"),
 			Key:       "key-3",
 			Namespace: "testNamespace",
 			Distance:  float32(3),
@@ -1154,7 +1154,7 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 	vector := []float32{1.0, 2.0, 3.0}
 	limit := uint32(7)
 	searchParams := &protos.HnswSearchParams{
-		Ef: Ptr(uint32(8)),
+		Ef: ptr(uint32(8)),
 	}
 
 	neighbors, err := client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
@@ -1189,7 +1189,7 @@ func TestVectorSearchFloat32_FailsGettingConn(t *testing.T) {
 	vector := []float32{1.0, 2.0, 3.0}
 	limit := uint32(7)
 	searchParams := &protos.HnswSearchParams{
-		Ef: Ptr(uint32(8)),
+		Ef: ptr(uint32(8)),
 	}
 
 	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
@@ -1231,7 +1231,7 @@ func TestVectorSearchFloat32_FailsVectorSearch(t *testing.T) {
 	vector := []float32{1.0, 2.0, 3.0}
 	limit := uint32(7)
 	searchParams := &protos.HnswSearchParams{
-		Ef: Ptr(uint32(8)),
+		Ef: ptr(uint32(8)),
 	}
 
 	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
@@ -1284,7 +1284,7 @@ func TestVectorSearchFloat32_FailedToRecvAllNeighbors(t *testing.T) {
 	vector := []float32{1.0, 2.0, 3.0}
 	limit := uint32(7)
 	searchParams := &protos.HnswSearchParams{
-		Ef: Ptr(uint32(8)),
+		Ef: ptr(uint32(8)),
 	}
 
 	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
@@ -1343,7 +1343,7 @@ func TestVectorSearchFloat32_FailedToConvertNeighbor(t *testing.T) {
 	vector := []float32{1.0, 2.0, 3.0}
 	limit := uint32(7)
 	searchParams := &protos.HnswSearchParams{
-		Ef: Ptr(uint32(8)),
+		Ef: ptr(uint32(8)),
 	}
 
 	_, err = client.VectorSearchFloat32(ctx, namespace, indexName, vector, uint32(limit), searchParams, nil, nil)
@@ -1722,7 +1722,7 @@ func TestIndexUpdate_Success(t *testing.T) {
 		},
 		Update: &protos.IndexUpdateRequest_HnswIndexUpdate{
 			HnswIndexUpdate: &protos.HnswIndexUpdate{
-				MaxMemQueueSize: Ptr(uint32(10)),
+				MaxMemQueueSize: ptr(uint32(10)),
 			},
 		},
 	}
@@ -1747,7 +1747,7 @@ func TestIndexUpdate_Success(t *testing.T) {
 		"foo": "bar",
 	}
 	hnswParams := &protos.HnswIndexUpdate{
-		MaxMemQueueSize: Ptr(uint32(10)),
+		MaxMemQueueSize: ptr(uint32(10)),
 	}
 
 	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams)
@@ -1782,7 +1782,7 @@ func TestIndexUpdate_FailGetConn(t *testing.T) {
 		"foo": "bar",
 	}
 	hnswParams := &protos.HnswIndexUpdate{
-		MaxMemQueueSize: Ptr(uint32(10)),
+		MaxMemQueueSize: ptr(uint32(10)),
 	}
 
 	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams)
@@ -1824,7 +1824,7 @@ func TestIndexUpdate_FailUpdateCall(t *testing.T) {
 		"foo": "bar",
 	}
 	hnswParams := &protos.HnswIndexUpdate{
-		MaxMemQueueSize: Ptr(uint32(10)),
+		MaxMemQueueSize: ptr(uint32(10)),
 	}
 
 	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams)
@@ -1967,7 +1967,7 @@ func TestIndexList_Success(t *testing.T) {
 		Return(mockConn, nil)
 
 	expectedIndexListRequest := &protos.IndexListRequest{
-		ApplyDefaults: Ptr(true),
+		ApplyDefaults: ptr(true),
 	}
 
 	expectedIndexDefs := &protos.IndexDefinitionList{
@@ -2090,7 +2090,7 @@ func TestIndexGet_Success(t *testing.T) {
 			Namespace: "testNamespace",
 			Name:      "testIndex",
 		},
-		ApplyDefaults: Ptr(true),
+		ApplyDefaults: ptr(true),
 	}
 
 	expectedIndexDefs := &protos.IndexDefinition{
