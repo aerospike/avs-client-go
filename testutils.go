@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-type ServerTestBaseSuite struct {
+type serverTestBaseSuite struct {
 	suite.Suite
 	Name         string
 	ComposeFile  string
@@ -35,7 +35,7 @@ type ServerTestBaseSuite struct {
 
 var wd, _ = os.Getwd()
 
-func (suite *ServerTestBaseSuite) SetupSuite() {
+func (suite *serverTestBaseSuite) SetupSuite() {
 	suite.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	if suite.Name != "" {
@@ -44,7 +44,7 @@ func (suite *ServerTestBaseSuite) SetupSuite() {
 
 	suite.CoverFile = path.Join(wd, "../coverage/client-coverage.cov")
 
-	err := DockerComposeUp(suite.ComposeFile)
+	err := dockerComposeUp(suite.ComposeFile)
 
 	time.Sleep(time.Second * 10)
 
@@ -54,17 +54,17 @@ func (suite *ServerTestBaseSuite) SetupSuite() {
 
 	suite.Assert().NoError(err)
 
-	suite.AvsClient, err = GetClient(suite.AvsHostPort, suite.AvsLB, suite.AvsCreds, suite.AvsTLSConfig, suite.Logger)
+	suite.AvsClient, err = getClient(suite.AvsHostPort, suite.AvsLB, suite.AvsCreds, suite.AvsTLSConfig, suite.Logger)
 	if err != nil {
 		suite.FailNowf("unable to create admin client", "%v", err)
 	}
 }
 
-func (suite *ServerTestBaseSuite) TearDownSuite() {
+func (suite *serverTestBaseSuite) TearDownSuite() {
 	err := suite.AvsClient.Close()
 	suite.Assert().NoError(err)
 
-	err = DockerComposeDown(suite.ComposeFile)
+	err = dockerComposeDown(suite.ComposeFile)
 	if err != nil {
 		fmt.Println("unable to stop docker compose down")
 	}
@@ -72,15 +72,15 @@ func (suite *ServerTestBaseSuite) TearDownSuite() {
 	goleak.VerifyNone(suite.T())
 }
 
-func Ptr[T any](value T) *T {
+func ptr[T any](value T) *T {
 	return &value
 }
 
-func CreateFlagStr(name, value string) string {
+func createFlagStr(name, value string) string {
 	return fmt.Sprintf("--%s %s", name, value)
 }
 
-type IndexDefinitionBuilder struct {
+type indexDefinitionBuilder struct {
 	indexName                      string
 	namespace                      string
 	set                            *string
@@ -107,14 +107,14 @@ type IndexDefinitionBuilder struct {
 	hnswMergeReIndexParallelism    *uint32
 }
 
-func NewIndexDefinitionBuilder(
+func newIndexDefinitionBuilder(
 	indexName,
 	namespace string,
 	dimension int,
 	distanceMetric protos.VectorDistanceMetric,
 	vectorField string,
-) *IndexDefinitionBuilder {
-	return &IndexDefinitionBuilder{
+) *indexDefinitionBuilder {
+	return &indexDefinitionBuilder{
 		indexName:            indexName,
 		namespace:            namespace,
 		dimension:            dimension,
@@ -123,97 +123,97 @@ func NewIndexDefinitionBuilder(
 	}
 }
 
-func (idb *IndexDefinitionBuilder) WithSet(set string) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithSet(set string) *indexDefinitionBuilder {
 	idb.set = &set
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithLabels(labels map[string]string) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithLabels(labels map[string]string) *indexDefinitionBuilder {
 	idb.labels = labels
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithStorageNamespace(storageNamespace string) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithStorageNamespace(storageNamespace string) *indexDefinitionBuilder {
 	idb.storageNamespace = &storageNamespace
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithStorageSet(storageSet string) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithStorageSet(storageSet string) *indexDefinitionBuilder {
 	idb.storageSet = &storageSet
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswM(m uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswM(m uint32) *indexDefinitionBuilder {
 	idb.hnsfM = &m
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswEf(ef uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswEf(ef uint32) *indexDefinitionBuilder {
 	idb.hnsfEf = &ef
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswEfConstruction(efConstruction uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswEfConstruction(efConstruction uint32) *indexDefinitionBuilder {
 	idb.hnsfEfC = &efConstruction
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswMaxMemQueueSize(maxMemQueueSize uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswMaxMemQueueSize(maxMemQueueSize uint32) *indexDefinitionBuilder {
 	idb.hnswMemQueueSize = &maxMemQueueSize
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswBatchingMaxRecord(maxRecord uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswBatchingMaxRecord(maxRecord uint32) *indexDefinitionBuilder {
 	idb.hnsfBatchingMaxRecord = &maxRecord
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswBatchingInterval(interval uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswBatchingInterval(interval uint32) *indexDefinitionBuilder {
 	idb.hnsfBatchingInterval = &interval
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswCacheExpiry(expiry uint64) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswCacheExpiry(expiry uint64) *indexDefinitionBuilder {
 	idb.hnswCacheExpiry = &expiry
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswCacheMaxEntries(maxEntries uint64) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswCacheMaxEntries(maxEntries uint64) *indexDefinitionBuilder {
 	idb.hnswCacheMaxEntries = &maxEntries
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswHealerMaxScanPageSize(maxScanPageSize uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswHealerMaxScanPageSize(maxScanPageSize uint32) *indexDefinitionBuilder {
 	idb.hnswHealerMaxScanPageSize = &maxScanPageSize
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswHealerMaxScanRatePerNode(maxScanRatePerSecond uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswHealerMaxScanRatePerNode(maxScanRatePerSecond uint32) *indexDefinitionBuilder {
 	idb.hnswHealerMaxScanRatePerSecond = &maxScanRatePerSecond
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswHealerParallelism(parallelism uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswHealerParallelism(parallelism uint32) *indexDefinitionBuilder {
 	idb.hnswHealerParallelism = &parallelism
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswHealerReindexPercent(reindexPercent float32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswHealerReindexPercent(reindexPercent float32) *indexDefinitionBuilder {
 	idb.HnswHealerReindexPercent = &reindexPercent
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswHealerScheduleDelay(schedule string) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswHealerScheduleDelay(schedule string) *indexDefinitionBuilder {
 	idb.HnswHealerSchedule = &schedule
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) WithHnswMergeParallelism(mergeParallelism uint32) *IndexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswMergeParallelism(mergeParallelism uint32) *indexDefinitionBuilder {
 	idb.hnswMergeIndexParallelism = &mergeParallelism
 	return idb
 }
 
-func (idb *IndexDefinitionBuilder) Build() *protos.IndexDefinition {
+func (idb *indexDefinitionBuilder) Build() *protos.IndexDefinition {
 	indexDef := &protos.IndexDefinition{
 		Id: &protos.IndexId{
 			Name:      idb.indexName,
@@ -229,12 +229,12 @@ func (idb *IndexDefinitionBuilder) Build() *protos.IndexDefinition {
 		},
 		Params: &protos.IndexDefinition_HnswParams{
 			HnswParams: &protos.HnswParams{
-				M:              Ptr(uint32(16)),
-				EfConstruction: Ptr(uint32(100)),
-				Ef:             Ptr(uint32(100)),
+				M:              ptr(uint32(16)),
+				EfConstruction: ptr(uint32(100)),
+				Ef:             ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxRecords: Ptr(uint32(100000)),
-					Interval:   Ptr(uint32(30000)),
+					MaxRecords: ptr(uint32(100000)),
+					Interval:   ptr(uint32(30000)),
 				},
 				CachingParams: &protos.HnswCachingParams{},
 				HealerParams:  &protos.HnswHealerParams{},
@@ -320,7 +320,7 @@ func (idb *IndexDefinitionBuilder) Build() *protos.IndexDefinition {
 	return indexDef
 }
 
-func DockerComposeUp(composeFile string) error {
+func dockerComposeUp(composeFile string) error {
 	fmt.Println("Starting docker containers " + composeFile)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -341,7 +341,7 @@ func DockerComposeUp(composeFile string) error {
 	return nil
 }
 
-func DockerComposeDown(composeFile string) error {
+func dockerComposeDown(composeFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -358,7 +358,7 @@ func DockerComposeDown(composeFile string) error {
 	return nil
 }
 
-func GetClient(
+func getClient(
 	avsHostPort *HostPort,
 	avsLB bool,
 	avsCreds *UserPassCredentials,
@@ -417,7 +417,7 @@ func GetClient(
 	return avsClient, nil
 }
 
-func GetCACert(cert string) (*x509.CertPool, error) {
+func getCACert(cert string) (*x509.CertPool, error) {
 	// read in file
 	certBytes, err := os.ReadFile(cert)
 	if err != nil {
@@ -428,7 +428,7 @@ func GetCACert(cert string) (*x509.CertPool, error) {
 	return client.LoadCACerts([][]byte{certBytes}), nil
 }
 
-func GetCertificates(certFile string, keyFile string) ([]tls.Certificate, error) {
+func getCertificates(certFile string, keyFile string) ([]tls.Certificate, error) {
 	cert, err := os.ReadFile(certFile)
 	if err != nil {
 		log.Fatalf("unable to read cert file %v", err)
