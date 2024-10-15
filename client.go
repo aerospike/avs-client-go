@@ -163,7 +163,7 @@ func (c *Client) put(
 
 	putReq := &protos.PutRequest{
 		Key:                protoKey,
-		WriteType:          writeType,
+		WriteType:          &writeType,
 		Fields:             fields,
 		IgnoreMemQueueFull: ignoreMemQueueFull,
 	}
@@ -786,7 +786,7 @@ func (c *Client) IndexCreate(
 			Name:      indexName,
 		},
 		Dimensions:           dimensions,
-		VectorDistanceMetric: vectorDistanceMetric,
+		VectorDistanceMetric: &vectorDistanceMetric,
 		Field:                vectorField,
 		SetFilter:            set,
 		Params:               params,
