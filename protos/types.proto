@@ -202,6 +202,10 @@ message HnswParams {
 
   // Configures merge of batch indices to main index.
   HnswIndexMergeParams mergeParams = 8;
+
+  // Verify whether the underlying vector has changed before returning the kAnn
+  // result. Defaults to true.
+  optional bool enableVectorIntegrityCheck = 9;
 }
 
 // Params for the HNSW index search.
@@ -234,7 +238,7 @@ message HnswCachingParams {
   // A cache entry will expire after this time in milliseconds has
   // expired after the entry was added to cache.
   // Defaults to the global cache config configured for the VectorDB.
-  optional uint64 expiry = 2;
+  optional int64 expiry = 2;
 }
 
 // Params to configure Hnsw index cache
@@ -292,6 +296,10 @@ message HnswIndexUpdate {
 
   // Configures merge of batch indices to main index.
   optional HnswIndexMergeParams mergeParams = 5;
+
+  // Verify whether the underlying vector has changed before returning the kAnn
+  // result. Defaults to true.
+  optional bool enableVectorIntegrityCheck = 6;
 }
 
 // Index storage configuration
@@ -310,15 +318,15 @@ message IndexDefinition {
   // The index identifier.
   IndexId id = 1;
 
-  // The type of index.
-  IndexType type = 2;
+  // The type of index. Defaults to HNSW.
+  optional IndexType type = 2;
 
   // Number of dimensions in data.
   // Vectors not matching the dimension count will not be indexed.
   uint32 dimensions = 3;
 
-  // Optional The distance metric to use. Defaults to SQUARED_EUCLIDEAN
-  VectorDistanceMetric vectorDistanceMetric = 4;
+  // Optional The distance metric to use. Defaults to SQUARED_EUCLIDEAN.
+  optional VectorDistanceMetric vectorDistanceMetric = 4;
 
   // Name of the record vector field to index.
   string field = 5;
