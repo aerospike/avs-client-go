@@ -72,10 +72,6 @@ func (suite *serverTestBaseSuite) TearDownSuite() {
 	goleak.VerifyNone(suite.T())
 }
 
-func ptr[T any](value T) *T {
-	return &value
-}
-
 func createFlagStr(name, value string) string {
 	return fmt.Sprintf("--%s %s", name, value)
 }

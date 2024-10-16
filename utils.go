@@ -8,6 +8,10 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 )
 
+func ptr[T any](value T) *T {
+	return &value
+}
+
 func createUserPassCredential(username, password string) *protos.Credentials {
 	return &protos.Credentials{
 		Username: username,
