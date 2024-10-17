@@ -267,8 +267,7 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_SQUARED_EUCLIDEAN,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_SQUARED_EUCLIDEAN),
 				SetFilter:            nil,
 				Field:                "vector",
 			},
@@ -296,8 +295,7 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -377,8 +375,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -418,7 +415,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				},
 				CachingParams: &protos.HnswCachingParams{
 					MaxEntries: ptr(uint64(10_003)),
-					Expiry:     ptr(uint64(10_004)),
+					Expiry:     ptr(int64(10_004)),
 				},
 				HealerParams: &protos.HnswHealerParams{
 					MaxScanRatePerNode: ptr(uint32(10_005)),
@@ -441,8 +438,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -462,7 +458,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 						},
 						CachingParams: &protos.HnswCachingParams{
 							MaxEntries: ptr(uint64(10_003)),
-							Expiry:     ptr(uint64(10_004)),
+							Expiry:     ptr(int64(10_004)),
 						},
 						HealerParams: &protos.HnswHealerParams{
 							MaxScanRatePerNode: ptr(uint32(10_005)),
@@ -1316,7 +1312,7 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 		{
 			name:            "nil-node",
 			nodeId:          nil,
-			expectedVersion: "0.10.0",
+			expectedVersion: "0.10.1-SNAPSHOT",
 		},
 		{
 			name: "node id DNE",

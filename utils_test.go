@@ -20,11 +20,11 @@ func TestCreateProjectionSpec(t *testing.T) {
 			excludeFields: nil,
 			expectedProjectionSpec: &protos.ProjectionSpec{
 				Include: &protos.ProjectionFilter{
-					Type:   protos.ProjectionType_SPECIFIED,
+					Type:   ptr(protos.ProjectionType_SPECIFIED),
 					Fields: []string{"field1", "field2"},
 				},
 				Exclude: &protos.ProjectionFilter{
-					Type: protos.ProjectionType_NONE,
+					Type: ptr(protos.ProjectionType_NONE),
 				},
 			},
 		},
@@ -34,10 +34,10 @@ func TestCreateProjectionSpec(t *testing.T) {
 			excludeFields: []string{"field3", "field4"},
 			expectedProjectionSpec: &protos.ProjectionSpec{
 				Include: &protos.ProjectionFilter{
-					Type: protos.ProjectionType_ALL,
+					Type: ptr(protos.ProjectionType_ALL),
 				},
 				Exclude: &protos.ProjectionFilter{
-					Type:   protos.ProjectionType_SPECIFIED,
+					Type:   ptr(protos.ProjectionType_SPECIFIED),
 					Fields: []string{"field3", "field4"},
 				},
 			},
@@ -48,10 +48,10 @@ func TestCreateProjectionSpec(t *testing.T) {
 			excludeFields: nil,
 			expectedProjectionSpec: &protos.ProjectionSpec{
 				Include: &protos.ProjectionFilter{
-					Type: protos.ProjectionType_ALL,
+					Type: ptr(protos.ProjectionType_ALL),
 				},
 				Exclude: &protos.ProjectionFilter{
-					Type: protos.ProjectionType_NONE,
+					Type: ptr(protos.ProjectionType_NONE),
 				},
 			},
 		},

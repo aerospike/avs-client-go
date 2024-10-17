@@ -72,10 +72,6 @@ func (suite *serverTestBaseSuite) TearDownSuite() {
 	goleak.VerifyNone(suite.T())
 }
 
-func ptr[T any](value T) *T {
-	return &value
-}
-
 func createFlagStr(name, value string) string {
 	return fmt.Sprintf("--%s %s", name, value)
 }
@@ -96,7 +92,7 @@ type indexDefinitionBuilder struct {
 	hnswMemQueueSize               *uint32
 	hnsfBatchingMaxRecord          *uint32
 	hnsfBatchingInterval           *uint32
-	hnswCacheExpiry                *uint64
+	hnswCacheExpiry                *int64
 	hnswCacheMaxEntries            *uint64
 	hnswHealerMaxScanPageSize      *uint32
 	hnswHealerMaxScanRatePerSecond *uint32
@@ -173,7 +169,7 @@ func (idb *indexDefinitionBuilder) WithHnswBatchingInterval(interval uint32) *in
 	return idb
 }
 
-func (idb *indexDefinitionBuilder) WithHnswCacheExpiry(expiry uint64) *indexDefinitionBuilder {
+func (idb *indexDefinitionBuilder) WithHnswCacheExpiry(expiry int64) *indexDefinitionBuilder {
 	idb.hnswCacheExpiry = &expiry
 	return idb
 }
@@ -220,9 +216,9 @@ func (idb *indexDefinitionBuilder) Build() *protos.IndexDefinition {
 			Namespace: idb.namespace,
 		},
 		Dimensions:           uint32(idb.dimension),
-		VectorDistanceMetric: idb.vectorDistanceMetric,
+		VectorDistanceMetric: &idb.vectorDistanceMetric,
 		Field:                idb.vectorField,
-		Type:                 protos.IndexType_HNSW,
+		Type:                 nil, // defaults to protos.IndexType_HNSW
 		Storage: &protos.IndexStorage{
 			Namespace: &idb.namespace,
 			Set:       &idb.indexName,
