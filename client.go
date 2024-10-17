@@ -792,6 +792,7 @@ func (c *Client) IndexCreate(
 		Params:               params,
 		Labels:               labels,
 		Storage:              storage,
+		Type:                 ptr(protos.IndexType_HNSW),
 	}
 
 	return c.IndexCreateFromIndexDef(ctx, indexDef)

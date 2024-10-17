@@ -124,7 +124,7 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
-var minimumFullySupportedAVSVersion = newVersion("0.10.0")
+var minimumFullySupportedAVSVersion = newVersion("0.10.1")
 
 type version []any
 

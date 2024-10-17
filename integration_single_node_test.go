@@ -1316,7 +1316,7 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 		{
 			name:            "nil-node",
 			nodeId:          nil,
-			expectedVersion: "0.10.0",
+			expectedVersion: "0.10.1",
 		},
 		{
 			name: "node id DNE",
