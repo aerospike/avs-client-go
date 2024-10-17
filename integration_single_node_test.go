@@ -268,7 +268,6 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 				},
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_SQUARED_EUCLIDEAN),
-				Type:                 ptr(protos.IndexType_HNSW),
 				SetFilter:            nil,
 				Field:                "vector",
 			},
@@ -297,7 +296,6 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 				},
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
-				Type:                 ptr(protos.IndexType_HNSW),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -378,7 +376,6 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				},
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
-				Type:                 ptr(protos.IndexType_HNSW),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -442,7 +439,6 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				},
 				Dimensions:           uint32(10),
 				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
-				Type:                 ptr(protos.IndexType_HNSW),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{

@@ -218,7 +218,7 @@ func (idb *indexDefinitionBuilder) Build() *protos.IndexDefinition {
 		Dimensions:           uint32(idb.dimension),
 		VectorDistanceMetric: &idb.vectorDistanceMetric,
 		Field:                idb.vectorField,
-		Type:                 ptr(protos.IndexType_HNSW),
+		Type:                 nil, // defaults to protos.IndexType_HNSW
 		Storage: &protos.IndexStorage{
 			Namespace: &idb.namespace,
 			Set:       &idb.indexName,
