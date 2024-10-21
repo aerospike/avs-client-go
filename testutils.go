@@ -229,12 +229,12 @@ func (idb *indexDefinitionBuilder) Build() *protos.IndexDefinition {
 				EfConstruction: ptr(uint32(100)),
 				Ef:             ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxRecords: ptr(uint32(100000)),
-					Interval:   ptr(uint32(30000)),
+					MaxIndexRecords: ptr(uint32(100000)),
+					IndexInterval:   ptr(uint32(30000)),
 				},
-				CachingParams: &protos.HnswCachingParams{},
-				HealerParams:  &protos.HnswHealerParams{},
-				MergeParams:   &protos.HnswIndexMergeParams{},
+				IndexCachingParams: &protos.HnswCachingParams{},
+				HealerParams:       &protos.HnswHealerParams{},
+				MergeParams:        &protos.HnswIndexMergeParams{},
 			},
 		},
 	}
@@ -266,11 +266,11 @@ func (idb *indexDefinitionBuilder) Build() *protos.IndexDefinition {
 	}
 
 	if idb.hnsfBatchingMaxRecord != nil {
-		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.BatchingParams.MaxRecords = idb.hnsfBatchingMaxRecord
+		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.BatchingParams.MaxIndexRecords = idb.hnsfBatchingMaxRecord
 	}
 
 	if idb.hnsfBatchingInterval != nil {
-		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.BatchingParams.Interval = idb.hnsfBatchingInterval
+		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.BatchingParams.IndexInterval = idb.hnsfBatchingInterval
 	}
 
 	if idb.hnswMemQueueSize != nil {
@@ -278,11 +278,11 @@ func (idb *indexDefinitionBuilder) Build() *protos.IndexDefinition {
 	}
 
 	if idb.hnswCacheExpiry != nil {
-		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.CachingParams.Expiry = idb.hnswCacheExpiry
+		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.IndexCachingParams.Expiry = idb.hnswCacheExpiry
 	}
 
 	if idb.hnswCacheMaxEntries != nil {
-		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.CachingParams.MaxEntries = idb.hnswCacheMaxEntries
+		indexDef.Params.(*protos.IndexDefinition_HnswParams).HnswParams.IndexCachingParams.MaxEntries = idb.hnswCacheMaxEntries
 	}
 
 	if idb.hnswHealerMaxScanPageSize != nil {

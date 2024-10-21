@@ -194,8 +194,9 @@ message HnswParams {
   // Defaults to global indexing config configured for the VectorDB.
   optional uint32 maxMemQueueSize = 5;
 
-  // Configures caching for Hnsw Index.
-  HnswCachingParams cachingParams = 6;
+  // Configures caching for Hnsw Index. It is turned on by default with maximum
+  // 2 million entries and 1 hour expiry.
+  HnswCachingParams indexCachingParams = 6;
 
   // Configures index healer params.
   HnswHealerParams healerParams = 7;
@@ -206,6 +207,9 @@ message HnswParams {
   // Verify whether the underlying vector has changed before returning the kAnn
   // result. Defaults to true.
   optional bool enableVectorIntegrityCheck = 9;
+
+  // Configures caching for vector records. It is turned off by default.
+  optional HnswCachingParams recordCachingParams = 10;
 }
 
 // Params for the HNSW index search.
@@ -267,13 +271,23 @@ message HnswHealerParams {
 
 // Configures batching behaviour for batch based index update.
 message HnswBatchingParams {
-  // Maximum number of records to fit in a batch.
-  // The default value is 10000.
-  optional uint32 maxRecords = 1;
+  // Maximum number of index records to fit in a batch.
+  // The default value is 100_000 and can't be less than 1000.
+  optional uint32 maxIndexRecords = 1;
 
-  // The maximum amount of time in milliseconds to wait before finalizing a batch.
-  // The default value is 10000.
-  optional uint32 interval = 2;
+  // The maximum amount of time in milliseconds to wait before finalizing a
+  // index records batch.
+  // The default value is 30000 and can't be less than 10000.
+  optional uint32 indexInterval = 2;
+
+  // Maximum number of reindex records to fit in a batch.
+  // The default value is max(maxIndexRecords / 10, 1000).
+  optional uint32 maxReindexRecords = 3;
+
+  // The maximum amount of time in milliseconds to wait before finalizing a
+  // reindex records batch.
+  // The default value is indexInterval and can't be less than 10000.
+  optional uint32 reindexInterval = 4;
 }
 
 // Message to update a HNSW index parameters.
@@ -288,8 +302,9 @@ message HnswIndexUpdate {
   // Defaults to global indexing config configured for the VectorDB.
   optional uint32 maxMemQueueSize = 2;
 
-  // Configures caching for Hnsw Index.
-  optional HnswCachingParams cachingParams = 3;
+  // Configures caching for Hnsw Index. It is turned on by default with maximum
+  // 2 million entries and 1 hour expiry.
+  optional HnswCachingParams indexCachingParams = 3;
 
   // Configures index healer params.
   optional HnswHealerParams healerParams = 4;
@@ -300,6 +315,9 @@ message HnswIndexUpdate {
   // Verify whether the underlying vector has changed before returning the kAnn
   // result. Defaults to true.
   optional bool enableVectorIntegrityCheck = 6;
+
+  // Configures caching for vector records. It is turned off by default.
+  optional HnswCachingParams recordCachingParams = 7;
 }
 
 // Index storage configuration
