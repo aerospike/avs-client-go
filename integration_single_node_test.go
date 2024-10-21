@@ -431,6 +431,10 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					IndexParallelism:   ptr(uint32(2)),
 					ReIndexParallelism: ptr(uint32(3)),
 				},
+				RecordCachingParams: &protos.HnswCachingParams{
+					MaxEntries: ptr(uint64(10_007)),
+					Expiry:     ptr(int64(10_008)),
+				},
 			},
 			updateLabels: map[string]string{
 				"c": "d",
@@ -473,6 +477,11 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 						MergeParams: &protos.HnswIndexMergeParams{
 							IndexParallelism:   ptr(uint32(2)),
 							ReIndexParallelism: ptr(uint32(3)),
+						},
+						// TODO fix this EnableVectorIntegrityCheck: ptr(true),
+						RecordCachingParams: &protos.HnswCachingParams{
+							MaxEntries: ptr(uint64(10_007)),
+							Expiry:     ptr(int64(10_008)),
 						},
 					},
 				},
