@@ -92,9 +92,6 @@ func TestSingleNodeSuite(t *testing.T) {
 		},
 	}
 
-	// // TODO REMOVE THIS, TEMPORARY
-	// suites = suites[0:1]
-
 	testSuiteEnv := os.Getenv("ASVEC_TEST_SUITES")
 	picked_suites := map[int]struct{}{}
 
@@ -413,8 +410,10 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 			updateHnsw: &protos.HnswIndexUpdate{
 				MaxMemQueueSize: ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxIndexRecords: ptr(uint32(10_001)),
-					IndexInterval:   ptr(uint32(10_002)),
+					MaxIndexRecords:   ptr(uint32(10_001)),
+					IndexInterval:     ptr(uint32(10_002)),
+					MaxReindexRecords: ptr(uint32(10_001)),
+					ReindexInterval:   ptr(uint32(10_002)),
 				},
 				IndexCachingParams: &protos.HnswCachingParams{
 					MaxEntries: ptr(uint64(10_003)),
@@ -460,8 +459,10 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					HnswParams: &protos.HnswParams{
 						MaxMemQueueSize: ptr(uint32(100)),
 						BatchingParams: &protos.HnswBatchingParams{
-							MaxIndexRecords: ptr(uint32(10_001)),
-							IndexInterval:   ptr(uint32(10_002)),
+							MaxIndexRecords:   ptr(uint32(10_001)),
+							IndexInterval:     ptr(uint32(10_002)),
+							MaxReindexRecords: ptr(uint32(10_001)),
+							ReindexInterval:   ptr(uint32(10_002)),
 						},
 						IndexCachingParams: &protos.HnswCachingParams{
 							MaxEntries: ptr(uint64(10_003)),
