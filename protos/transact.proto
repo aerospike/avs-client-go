@@ -37,8 +37,8 @@ message PutRequest {
   // The key for the record to insert/update
   Key key = 1;
 
-  // The type of the put/write request.
-  WriteType writeType = 2;
+  // The type of the put/write request. Defaults to UPSERT.
+  optional WriteType writeType = 2;
 
   // The record fields.
   repeated Field fields = 3;
@@ -88,8 +88,8 @@ enum ProjectionType {
 
 // A projection filter.
 message ProjectionFilter {
-  // The type of the selector.
-  ProjectionType type = 1;
+  // The type of the selector. Defaults to ALL.
+  optional ProjectionType type = 1;
 
   // Names of desired fields / selectors.
   repeated string fields = 2;

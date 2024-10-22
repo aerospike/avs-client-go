@@ -8,6 +8,10 @@ import (
 	"github.com/aerospike/avs-client-go/protos"
 )
 
+func ptr[T any](value T) *T {
+	return &value
+}
+
 func createUserPassCredential(username, password string) *protos.Credentials {
 	return &protos.Credentials{
 		Username: username,
@@ -44,23 +48,23 @@ func createVectorSearchRequest(
 func createProjectionSpec(includeFields, excludeFields []string) *protos.ProjectionSpec {
 	spec := &protos.ProjectionSpec{
 		Include: &protos.ProjectionFilter{
-			Type: protos.ProjectionType_ALL,
+			Type: ptr(protos.ProjectionType_ALL),
 		},
 		Exclude: &protos.ProjectionFilter{
-			Type: protos.ProjectionType_NONE,
+			Type: ptr(protos.ProjectionType_NONE),
 		},
 	}
 
 	if includeFields != nil {
 		spec.Include = &protos.ProjectionFilter{
-			Type:   protos.ProjectionType_SPECIFIED,
+			Type:   ptr(protos.ProjectionType_SPECIFIED),
 			Fields: includeFields,
 		}
 	}
 
 	if excludeFields != nil {
 		spec.Exclude = &protos.ProjectionFilter{
-			Type:   protos.ProjectionType_SPECIFIED,
+			Type:   ptr(protos.ProjectionType_SPECIFIED),
 			Fields: excludeFields,
 		}
 	}
@@ -120,7 +124,7 @@ func endpointToHostPort(endpoint *protos.ServerEndpoint) *HostPort {
 	return NewHostPort(endpoint.Address, int(endpoint.Port))
 }
 
-var minimumFullySupportedAVSVersion = newVersion("0.10.0")
+var minimumFullySupportedAVSVersion = newVersion("0.11.0")
 
 type version []any
 

@@ -12,6 +12,12 @@ import "types.proto";
 message IndexStatusResponse {
   // Number of unmerged index records.
   int64 unmergedRecordCount = 2;
+
+  // Number of vector records indexed (0 in case healer has not yet run).
+  int64 indexHealerVectorRecordsIndexed = 3;
+
+  // Number of vertices in the main index (0 in case healer has not yet run).
+  int64 indexHealerVerticesValid = 4;
 }
 
 message GcInvalidVerticesRequest {
