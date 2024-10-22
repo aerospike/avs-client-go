@@ -288,6 +288,9 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 				Labels: map[string]string{
 					"a": "b",
 				},
+				HnswParams: &protos.HnswParams{
+					EnableVectorIntegrityCheck: ptr(false),
+				},
 			},
 			protos.IndexDefinition{
 				Id: &protos.IndexId{
@@ -306,7 +309,9 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 					"a": "b",
 				},
 				Params: &protos.IndexDefinition_HnswParams{
-					HnswParams: &protos.HnswParams{},
+					HnswParams: &protos.HnswParams{
+						EnableVectorIntegrityCheck: ptr(false),
+					},
 				},
 			},
 		},
@@ -434,6 +439,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					MaxEntries: ptr(uint64(10_007)),
 					Expiry:     ptr(int64(10_008)),
 				},
+				EnableVectorIntegrityCheck: ptr(true),
 			},
 			updateLabels: map[string]string{
 				"c": "d",
@@ -479,7 +485,6 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 							IndexParallelism:   ptr(uint32(2)),
 							ReIndexParallelism: ptr(uint32(3)),
 						},
-						// TODO fix this EnableVectorIntegrityCheck: ptr(true),
 						RecordCachingParams: &protos.HnswCachingParams{
 							MaxEntries: ptr(uint64(10_007)),
 							Expiry:     ptr(int64(10_008)),
