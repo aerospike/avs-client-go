@@ -30,7 +30,7 @@ $(MOCKGEN): $(GOBIN)
 	go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION)
 
 .PHONY: mocks
-mocks: $(MOCKGEN) $(ROOT_DIR)/client_mock.go $(ROOT_DIR)/connection_provider_mock.go $(PROTO_DIR)/auth_grpc_mock.pb.go $(PROTO_DIR)/index_grpc_mock.pb.go $(PROTO_DIR)/transact_grpc_mock.pb.go $(PROTO_DIR)/types_mock.pb.go $(PROTO_DIR)/user-admin_grpc_mock.pb.go $(PROTO_DIR)/vector-db_grpc_mock.pb.go
+mocks: $(MOCKGEN) $(ROOT_DIR)/client_mock.go $(ROOT_DIR)/connection_provider_mock.go $(PROTO_DIR)/auth_grpc_mock.pb.go $(PROTO_DIR)/index_grpc_mock.pb.go $(PROTO_DIR)/transact_grpc_mock.pb.go $(PROTO_DIR)/types_mock.pb.go $(PROTO_DIR)/user-admin_grpc_mock.pb.go $(PROTO_DIR)/vector-db_grpc_mock.pb.go $(PROTO_DIR)/transact_service_vector_search_client_mock.pb.go
 
 $(ROOT_DIR)/client_mock.go: $(ROOT_DIR)/client.go
 	$(MOCKGEN) --source $< --destination $@ --package avs
@@ -45,6 +45,9 @@ $(PROTO_DIR)/index_grpc_mock.pb.go: $(PROTO_DIR)/index_grpc.pb.go
 	$(MOCKGEN) --source $< --destination $@ --package protos
 
 $(PROTO_DIR)/transact_grpc_mock.pb.go: $(PROTO_DIR)/transact_grpc.pb.go
+	$(MOCKGEN) --source $< --destination $@ --package protos
+
+$(PROTO_DIR)/transact_service_vector_search_client_mock.pb.go: $(PROTO_DIR)/transact_service_vector_search_client.go
 	$(MOCKGEN) --source $< --destination $@ --package protos
 
 $(PROTO_DIR)/types_mock.pb.go: $(PROTO_DIR)/types.pb.go

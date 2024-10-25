@@ -45,7 +45,7 @@ func TestInsert_Success(t *testing.T) {
 				StringValue: "testKey",
 			},
 		},
-		WriteType: protos.WriteType_INSERT_ONLY,
+		WriteType: ptr(protos.WriteType_INSERT_ONLY),
 		Fields: []*protos.Field{
 			{
 				Name:  "field1",
@@ -251,7 +251,7 @@ func TestUpdate_Success(t *testing.T) {
 				StringValue: "testKey",
 			},
 		},
-		WriteType: protos.WriteType_UPDATE_ONLY,
+		WriteType: ptr(protos.WriteType_UPDATE_ONLY),
 		Fields: []*protos.Field{
 			{
 				Name:  "field1",
@@ -319,7 +319,7 @@ func TestReplace_Success(t *testing.T) {
 				StringValue: "testKey",
 			},
 		},
-		WriteType: protos.WriteType_UPSERT,
+		WriteType: ptr(protos.WriteType_UPSERT),
 		Fields: []*protos.Field{
 			{
 				Name:  "field1",
@@ -385,10 +385,10 @@ func TestGet_Success(t *testing.T) {
 		},
 		Projection: &protos.ProjectionSpec{
 			Include: &protos.ProjectionFilter{
-				Type: protos.ProjectionType_ALL,
+				Type: ptr(protos.ProjectionType_ALL),
 			},
 			Exclude: &protos.ProjectionFilter{
-				Type: protos.ProjectionType_NONE,
+				Type: ptr(protos.ProjectionType_NONE),
 			},
 		},
 	}
@@ -1012,7 +1012,7 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 	mockConn := &connection{
 		transactClient: mockTransactClient,
 	}
-	mockVectorSearchClient := protos.NewMockTransactService_VectorSearchClient(ctrl)
+	mockVectorSearchClient := protos.NewMockwrappedTransactService_VectorSearchClient(ctrl)
 
 	// Set up expectations for connProvider.GetRandomConn()
 	mockConnProvider.
@@ -1041,10 +1041,10 @@ func TestVectorSearchFloat32_Success(t *testing.T) {
 		},
 		Projection: &protos.ProjectionSpec{
 			Include: &protos.ProjectionFilter{
-				Type: protos.ProjectionType_ALL,
+				Type: ptr(protos.ProjectionType_ALL),
 			},
 			Exclude: &protos.ProjectionFilter{
-				Type: protos.ProjectionType_NONE,
+				Type: ptr(protos.ProjectionType_NONE),
 			},
 		},
 	}
@@ -1250,7 +1250,7 @@ func TestVectorSearchFloat32_FailedToRecvAllNeighbors(t *testing.T) {
 	mockConn := &connection{
 		transactClient: mockTransactClient,
 	}
-	mockVectorSearchClient := protos.NewMockTransactService_VectorSearchClient(ctrl)
+	mockVectorSearchClient := protos.NewMockwrappedTransactService_VectorSearchClient(ctrl)
 
 	// Set up expectations for connProvider.GetRandomConn()
 	mockConnProvider.
@@ -1307,7 +1307,7 @@ func TestVectorSearchFloat32_FailedToConvertNeighbor(t *testing.T) {
 	mockConn := &connection{
 		transactClient: mockTransactClient,
 	}
-	mockVectorSearchClient := protos.NewMockTransactService_VectorSearchClient(ctrl)
+	mockVectorSearchClient := protos.NewMockwrappedTransactService_VectorSearchClient(ctrl)
 
 	// Set up expectations for connProvider.GetRandomConn()
 	mockConnProvider.

@@ -267,8 +267,7 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_SQUARED_EUCLIDEAN,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_SQUARED_EUCLIDEAN),
 				SetFilter:            nil,
 				Field:                "vector",
 			},
@@ -289,6 +288,9 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 				Labels: map[string]string{
 					"a": "b",
 				},
+				HnswParams: &protos.HnswParams{
+					EnableVectorIntegrityCheck: ptr(false),
+				},
 			},
 			protos.IndexDefinition{
 				Id: &protos.IndexId{
@@ -296,8 +298,7 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -308,7 +309,9 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 					"a": "b",
 				},
 				Params: &protos.IndexDefinition_HnswParams{
-					HnswParams: &protos.HnswParams{},
+					HnswParams: &protos.HnswParams{
+						EnableVectorIntegrityCheck: ptr(false),
+					},
 				},
 			},
 		},
@@ -377,8 +380,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -413,12 +415,14 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 			updateHnsw: &protos.HnswIndexUpdate{
 				MaxMemQueueSize: ptr(uint32(100)),
 				BatchingParams: &protos.HnswBatchingParams{
-					MaxRecords: ptr(uint32(10_001)),
-					Interval:   ptr(uint32(10_002)),
+					MaxIndexRecords:   ptr(uint32(10_001)),
+					IndexInterval:     ptr(uint32(10_002)),
+					MaxReindexRecords: ptr(uint32(10_001)),
+					ReindexInterval:   ptr(uint32(10_002)),
 				},
-				CachingParams: &protos.HnswCachingParams{
+				IndexCachingParams: &protos.HnswCachingParams{
 					MaxEntries: ptr(uint64(10_003)),
-					Expiry:     ptr(uint64(10_004)),
+					Expiry:     ptr(int64(10_004)),
 				},
 				HealerParams: &protos.HnswHealerParams{
 					MaxScanRatePerNode: ptr(uint32(10_005)),
@@ -431,6 +435,11 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					IndexParallelism:   ptr(uint32(2)),
 					ReIndexParallelism: ptr(uint32(3)),
 				},
+				RecordCachingParams: &protos.HnswCachingParams{
+					MaxEntries: ptr(uint64(10_007)),
+					Expiry:     ptr(int64(10_008)),
+				},
+				EnableVectorIntegrityCheck: ptr(true),
 			},
 			updateLabels: map[string]string{
 				"c": "d",
@@ -441,8 +450,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					Name:      "index",
 				},
 				Dimensions:           uint32(10),
-				VectorDistanceMetric: protos.VectorDistanceMetric_COSINE,
-				Type:                 protos.IndexType_HNSW,
+				VectorDistanceMetric: ptr(protos.VectorDistanceMetric_COSINE),
 				SetFilter:            ptr("testset"),
 				Field:                "vector",
 				Storage: &protos.IndexStorage{
@@ -457,12 +465,14 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 					HnswParams: &protos.HnswParams{
 						MaxMemQueueSize: ptr(uint32(100)),
 						BatchingParams: &protos.HnswBatchingParams{
-							MaxRecords: ptr(uint32(10_001)),
-							Interval:   ptr(uint32(10_002)),
+							MaxIndexRecords:   ptr(uint32(10_001)),
+							IndexInterval:     ptr(uint32(10_002)),
+							MaxReindexRecords: ptr(uint32(10_001)),
+							ReindexInterval:   ptr(uint32(10_002)),
 						},
-						CachingParams: &protos.HnswCachingParams{
+						IndexCachingParams: &protos.HnswCachingParams{
 							MaxEntries: ptr(uint64(10_003)),
-							Expiry:     ptr(uint64(10_004)),
+							Expiry:     ptr(int64(10_004)),
 						},
 						HealerParams: &protos.HnswHealerParams{
 							MaxScanRatePerNode: ptr(uint32(10_005)),
@@ -474,6 +484,10 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 						MergeParams: &protos.HnswIndexMergeParams{
 							IndexParallelism:   ptr(uint32(2)),
 							ReIndexParallelism: ptr(uint32(3)),
+						},
+						RecordCachingParams: &protos.HnswCachingParams{
+							MaxEntries: ptr(uint64(10_007)),
+							Expiry:     ptr(int64(10_008)),
 						},
 					},
 				},
@@ -1316,7 +1330,7 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 		{
 			name:            "nil-node",
 			nodeId:          nil,
-			expectedVersion: "0.10.0",
+			expectedVersion: "0.11.1",
 		},
 		{
 			name: "node id DNE",
