@@ -489,6 +489,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 							MaxEntries: ptr(uint64(10_007)),
 							Expiry:     ptr(int64(10_008)),
 						},
+						EnableVectorIntegrityCheck: ptr(true),
 					},
 				},
 			},
@@ -1326,11 +1327,17 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 		nodeId          *protos.NodeId
 		expectedVersion string
 		expectedErrMsg  *string
+		expectedRoles   []protos.NodeRole
 	}{
 		{
 			name:            "nil-node",
 			nodeId:          nil,
-			expectedVersion: "0.11.1",
+			expectedVersion: "1.0.0",
+			// by default the node has all roles
+			expectedRoles: []protos.NodeRole{
+				protos.NodeRole_INDEX_QUERY,
+				protos.NodeRole_INDEX_UPDATE,
+			},
 		},
 		{
 			name: "node id DNE",
@@ -1344,7 +1351,7 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			actualVersion, err := suite.AvsClient.About(ctx, tc.nodeId)
+			aboutRes, err := suite.AvsClient.About(ctx, tc.nodeId)
 
 			if tc.expectedErrMsg != nil {
 				suite.Error(err)
@@ -1354,7 +1361,8 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 				suite.NoError(err)
 			}
 
-			suite.Equal(actualVersion.GetVersion(), tc.expectedVersion)
+			suite.Equal(tc.expectedVersion, aboutRes.GetVersion())
+			suite.Equal(tc.expectedRoles, aboutRes.GetRoles())
 		})
 	}
 }
