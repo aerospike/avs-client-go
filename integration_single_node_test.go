@@ -1333,7 +1333,6 @@ func (suite *SingleNodeTestSuite) TestAbout() {
 			name:            "nil-node",
 			nodeId:          nil,
 			expectedVersion: "1.0.0",
-			// by default the node has all roles
 			expectedRoles: []protos.NodeRole{
 				protos.NodeRole_INDEX_QUERY,
 				protos.NodeRole_INDEX_UPDATE,
