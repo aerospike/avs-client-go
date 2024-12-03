@@ -17,6 +17,9 @@ message AboutRequest {
 message AboutResponse {
   // AVS server version.
   string version = 1;
+
+  // Assigned node roles.
+  repeated NodeRole roles = 2;
 }
 
 // Cluster Id
@@ -27,6 +30,19 @@ message ClusterId {
 // A server node Id
 message NodeId {
   uint64 id = 1;
+}
+
+// Node roles determine the tasks a node will undertake.
+enum NodeRole {
+  // Node will handle ANN query related tasks.
+  INDEX_QUERY = 0;
+
+  // Node will handle vector index update/maintenance tasks including
+  // index, insert, delete and update of vector records and index healing.
+  INDEX_UPDATE = 1;
+
+  // Node will handle key value read operations.
+  KV_READ = 2;
 }
 
 // Server endpoint.
