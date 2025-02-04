@@ -727,6 +727,7 @@ type IndexCreateOpts struct {
 	HnswParams *protos.HnswParams
 	Labels     map[string]string
 	Sets       []string
+	Mode       *protos.IndexMode
 }
 
 // IndexCreate creates a new Aerospike Vector Index.
@@ -761,6 +762,7 @@ func (c *Client) IndexCreate(
 		params  *protos.IndexDefinition_HnswParams
 		labels  map[string]string
 		storage *protos.IndexStorage
+		mode    *protos.IndexMode
 	)
 
 	if opts != nil {
@@ -778,6 +780,7 @@ func (c *Client) IndexCreate(
 		params = &protos.IndexDefinition_HnswParams{HnswParams: opts.HnswParams}
 		labels = opts.Labels
 		storage = opts.Storage
+		mode = opts.Mode
 	}
 
 	indexDef := &protos.IndexDefinition{
@@ -793,6 +796,7 @@ func (c *Client) IndexCreate(
 		Labels:               labels,
 		Storage:              storage,
 		Type:                 nil, // defaults to protos.IndexType_HNSW
+		Mode:                 mode,
 	}
 
 	return c.IndexCreateFromIndexDef(ctx, indexDef)
