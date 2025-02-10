@@ -725,9 +725,9 @@ func (c *Client) WaitForIndexCompletion(
 type IndexCreateOpts struct {
 	Storage    *protos.IndexStorage
 	HnswParams *protos.HnswParams
+	Mode       *protos.IndexMode
 	Labels     map[string]string
 	Sets       []string
-	Mode       *protos.IndexMode
 }
 
 // IndexCreate creates a new Aerospike Vector Index.
