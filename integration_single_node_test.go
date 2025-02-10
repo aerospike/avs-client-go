@@ -291,6 +291,7 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 				HnswParams: &protos.HnswParams{
 					EnableVectorIntegrityCheck: ptr(false),
 				},
+				Mode: ptr(protos.IndexMode_STANDALONE),
 			},
 			protos.IndexDefinition{
 				Id: &protos.IndexId{
@@ -313,6 +314,7 @@ func (suite *SingleNodeTestSuite) TestIndexCreate() {
 						EnableVectorIntegrityCheck: ptr(false),
 					},
 				},
+				Mode: ptr(protos.IndexMode_STANDALONE),
 			},
 		},
 	}
@@ -353,6 +355,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 		opts                 *IndexCreateOpts
 		updateLabels         map[string]string
 		updateHnsw           *protos.HnswIndexUpdate
+		updateIndexMode      *protos.IndexMode
 		expectedIndex        protos.IndexDefinition
 	}{
 		{
@@ -444,6 +447,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 			updateLabels: map[string]string{
 				"c": "d",
 			},
+			updateIndexMode: ptr(protos.IndexMode_STANDALONE),
 			expectedIndex: protos.IndexDefinition{
 				Id: &protos.IndexId{
 					Namespace: "test",
@@ -492,6 +496,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 						EnableVectorIntegrityCheck: ptr(true),
 					},
 				},
+				Mode: ptr(protos.IndexMode_STANDALONE),
 			},
 		},
 	}
@@ -516,7 +521,7 @@ func (suite *SingleNodeTestSuite) TestIndexUpdate() {
 				return
 			}
 
-			err = suite.AvsClient.IndexUpdate(ctx, tc.namespace, tc.indexName, tc.updateLabels, tc.updateHnsw)
+			err = suite.AvsClient.IndexUpdate(ctx, tc.namespace, tc.indexName, tc.updateLabels, tc.updateHnsw, tc.updateIndexMode)
 			suite.NoError(err)
 
 			if err != nil {

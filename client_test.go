@@ -1725,6 +1725,7 @@ func TestIndexUpdate_Success(t *testing.T) {
 				MaxMemQueueSize: ptr(uint32(10)),
 			},
 		},
+		Mode: ptr(protos.IndexMode_DISTRIBUTED),
 	}
 
 	mockIndexClient.
@@ -1749,8 +1750,9 @@ func TestIndexUpdate_Success(t *testing.T) {
 	hnswParams := &protos.HnswIndexUpdate{
 		MaxMemQueueSize: ptr(uint32(10)),
 	}
+	indexMode := ptr(protos.IndexMode_DISTRIBUTED)
 
-	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams)
+	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams, indexMode)
 
 	assert.NoError(t, err)
 }
@@ -1785,7 +1787,7 @@ func TestIndexUpdate_FailGetConn(t *testing.T) {
 		MaxMemQueueSize: ptr(uint32(10)),
 	}
 
-	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams)
+	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams, nil)
 
 	var avsError *Error
 	assert.ErrorAs(t, err, &avsError)
@@ -1827,7 +1829,7 @@ func TestIndexUpdate_FailUpdateCall(t *testing.T) {
 		MaxMemQueueSize: ptr(uint32(10)),
 	}
 
-	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams)
+	err = client.IndexUpdate(ctx, testNamespace, testIndex, testMetadata, hnswParams, nil)
 
 	var avsError *Error
 	assert.ErrorAs(t, err, &avsError)
