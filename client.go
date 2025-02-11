@@ -725,6 +725,7 @@ func (c *Client) WaitForIndexCompletion(
 type IndexCreateOpts struct {
 	Storage    *protos.IndexStorage
 	HnswParams *protos.HnswParams
+	Mode       *protos.IndexMode
 	Labels     map[string]string
 	Sets       []string
 }
@@ -761,6 +762,7 @@ func (c *Client) IndexCreate(
 		params  *protos.IndexDefinition_HnswParams
 		labels  map[string]string
 		storage *protos.IndexStorage
+		mode    *protos.IndexMode
 	)
 
 	if opts != nil {
@@ -778,6 +780,7 @@ func (c *Client) IndexCreate(
 		params = &protos.IndexDefinition_HnswParams{HnswParams: opts.HnswParams}
 		labels = opts.Labels
 		storage = opts.Storage
+		mode = opts.Mode
 	}
 
 	indexDef := &protos.IndexDefinition{
@@ -793,24 +796,22 @@ func (c *Client) IndexCreate(
 		Labels:               labels,
 		Storage:              storage,
 		Type:                 nil, // defaults to protos.IndexType_HNSW
+		Mode:                 mode,
 	}
 
 	return c.IndexCreateFromIndexDef(ctx, indexDef)
 }
 
-// IndexUpdate updates an existing Aerospike Vector Index's dynamic configuration params.
+// IndexCreateFromIndexDef creates an HNSW index in AVS from an index definition.
 //
 // Args:
 //
 //	ctx (context.Context): The context for the operation.
-//	namespace (string): The namespace of the index.
-//	name (string): The name of the index.
-//	metadata (map[string]string): Metadata to update.
-//	hnswParams (*protos.HnswIndexUpdate): The new HNSW params to apply to the index.
+//	indexDef (*protos.IndexDefinition): The index definition to create the index from.
 //
 // Returns:
 //
-//	error: An error if the index update fails, otherwise nil.
+//	error: An error if the index creation fails, otherwise nil.
 func (c *Client) IndexCreateFromIndexDef(
 	ctx context.Context,
 	indexDef *protos.IndexDefinition,
@@ -853,6 +854,7 @@ func (c *Client) IndexCreateFromIndexDef(
 //	name (string): The name of the index.
 //	labels (map[string]string): Labels to update on the index.
 //	hnswParams (*protos.HnswIndexUpdate): The HNSW parameters to update.
+//	mode (*protos.IndexMode): The mode to change the index to.
 //
 // Returns:
 //
@@ -863,6 +865,7 @@ func (c *Client) IndexUpdate(
 	indexName string,
 	labels map[string]string,
 	hnswParams *protos.HnswIndexUpdate,
+	mode *protos.IndexMode,
 ) error {
 	logger := c.logger.With(slog.String("namespace", namespace), slog.String("indexName", indexName))
 
@@ -885,6 +888,7 @@ func (c *Client) IndexUpdate(
 		Update: &protos.IndexUpdateRequest_HnswIndexUpdate{
 			HnswIndexUpdate: hnswParams,
 		},
+		Mode: mode,
 	}
 
 	_, err = conn.indexClient.Update(ctx, indexUpdate)

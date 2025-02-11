@@ -363,11 +363,53 @@ message IndexDefinition {
 
   // Index storage.
   optional IndexStorage storage = 9;
+
+  // The mode of an Index.
+  // Defaults to DISTRIBUTED.
+  optional IndexMode mode = 10;
+}
+
+// Determines the mode of index update and maintenance.
+enum IndexMode {
+  // The DISTRIBUTED mode indicates the index is updated/maintained on a node
+  // with the indexer role.
+  DISTRIBUTED = 0;
+
+  // The STANDALONE mode indicates the index is updated/maintained on a node
+  // with the standalone-indexer role.
+  STANDALONE = 1;
+}
+
+// Determines the status of index.
+enum Status {
+  // This status indicates that the index is ready to handle updates and queries.
+  READY = 0;
+  // This status indicates that the index is not yet fully built and shouldn't
+  // be considered ready to handle updates and queries.
+  NOT_READY = 1;
 }
 
 // List of index definitions.
 message IndexDefinitionList {
   repeated IndexDefinition indices = 1;
+}
+
+// The current state of the standalone index.
+enum StandaloneIndexState {
+  // Index is being created.
+  CREATING = 0;
+  // Index has been built but not yet persisted.
+  CREATED = 1;
+  // Index is being persisted to the storage.
+  PERSISTING = 2;
+  // Index has been persisted to the storage.
+  PERSISTED = 3;
+  // Index is being marked DISTRIBUTED.
+  UPDATING = 4;
+  // Index has been marked DISTRIBUTED.
+  UPDATED = 5;
+  // Error case. Index building would be retried from the scratch.
+  FAILED = 6;
 }
 
 // A role.

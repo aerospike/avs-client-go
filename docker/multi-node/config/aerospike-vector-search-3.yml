@@ -6,6 +6,9 @@ cluster:
   # Unique identifier for this cluster.
   cluster-name: multi-node-avs
 
+  node-roles:
+    - index-update
+
 # The AVS service listening ports, TLS and network interface.
 service:
   ports:
