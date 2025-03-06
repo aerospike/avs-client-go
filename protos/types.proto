@@ -367,6 +367,9 @@ message IndexDefinition {
   // The mode of an Index.
   // Defaults to DISTRIBUTED.
   optional IndexMode mode = 10;
+
+  // Optional standalone index params.
+  optional StandaloneIndexParams standaloneIndexParams = 11;
 }
 
 // Determines the mode of index update and maintenance.
@@ -410,6 +413,18 @@ enum StandaloneIndexState {
   UPDATED = 5;
   // Error case. Index building would be retried from the scratch.
   FAILED = 6;
+}
+
+message StandaloneIndexParams {
+  // If true, the standalone index will be created using a memory-mapped file;
+  // otherwise, it will be created exclusively in memory. It is false by
+  // default.
+  bool useMemMap = 1;
+
+  // If useMemMap is set to true, specifies the path to the memory-mapped file.
+  // The default value can be configured in the healer sub-section of hnsw
+  // section in the AVS config file.
+  optional string memMapFilePath = 2;
 }
 
 // A role.
