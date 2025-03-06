@@ -27,6 +27,7 @@ const (
 	IndexService_Get_FullMethodName               = "/aerospike.vector.IndexService/Get"
 	IndexService_GetStatus_FullMethodName         = "/aerospike.vector.IndexService/GetStatus"
 	IndexService_GcInvalidVertices_FullMethodName = "/aerospike.vector.IndexService/GcInvalidVertices"
+	IndexService_AreIndicesInSync_FullMethodName  = "/aerospike.vector.IndexService/AreIndicesInSync"
 )
 
 // IndexServiceClient is the client API for IndexService service.
@@ -50,6 +51,9 @@ type IndexServiceClient interface {
 	GetStatus(ctx context.Context, in *IndexStatusRequest, opts ...grpc.CallOption) (*IndexStatusResponse, error)
 	// Garbage collect vertices identified as invalid before cutoff timestamp.
 	GcInvalidVertices(ctx context.Context, in *GcInvalidVerticesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Indicates if indices are in sync across the cluster. This call will eventually return
+	// true when all nodes in the AVS cluster have the same copy of the index.
+	AreIndicesInSync(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Boolean, error)
 }
 
 type indexServiceClient struct {
@@ -130,6 +134,16 @@ func (c *indexServiceClient) GcInvalidVertices(ctx context.Context, in *GcInvali
 	return out, nil
 }
 
+func (c *indexServiceClient) AreIndicesInSync(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Boolean, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Boolean)
+	err := c.cc.Invoke(ctx, IndexService_AreIndicesInSync_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexServiceServer is the server API for IndexService service.
 // All implementations must embed UnimplementedIndexServiceServer
 // for forward compatibility.
@@ -151,6 +165,9 @@ type IndexServiceServer interface {
 	GetStatus(context.Context, *IndexStatusRequest) (*IndexStatusResponse, error)
 	// Garbage collect vertices identified as invalid before cutoff timestamp.
 	GcInvalidVertices(context.Context, *GcInvalidVerticesRequest) (*emptypb.Empty, error)
+	// Indicates if indices are in sync across the cluster. This call will eventually return
+	// true when all nodes in the AVS cluster have the same copy of the index.
+	AreIndicesInSync(context.Context, *emptypb.Empty) (*Boolean, error)
 	mustEmbedUnimplementedIndexServiceServer()
 }
 
@@ -181,6 +198,9 @@ func (UnimplementedIndexServiceServer) GetStatus(context.Context, *IndexStatusRe
 }
 func (UnimplementedIndexServiceServer) GcInvalidVertices(context.Context, *GcInvalidVerticesRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GcInvalidVertices not implemented")
+}
+func (UnimplementedIndexServiceServer) AreIndicesInSync(context.Context, *emptypb.Empty) (*Boolean, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AreIndicesInSync not implemented")
 }
 func (UnimplementedIndexServiceServer) mustEmbedUnimplementedIndexServiceServer() {}
 func (UnimplementedIndexServiceServer) testEmbeddedByValue()                      {}
@@ -329,6 +349,24 @@ func _IndexService_GcInvalidVertices_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IndexService_AreIndicesInSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexServiceServer).AreIndicesInSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IndexService_AreIndicesInSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexServiceServer).AreIndicesInSync(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IndexService_ServiceDesc is the grpc.ServiceDesc for IndexService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -363,6 +401,10 @@ var IndexService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GcInvalidVertices",
 			Handler:    _IndexService_GcInvalidVertices_Handler,
+		},
+		{
+			MethodName: "AreIndicesInSync",
+			Handler:    _IndexService_AreIndicesInSync_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
