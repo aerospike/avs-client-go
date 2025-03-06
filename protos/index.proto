@@ -16,10 +16,11 @@ message StandaloneIndexMetrics {
   // Current state of the standalone index.
   StandaloneIndexState state = 2;
 
-  // Inserted record count. For state CREATING, it reflects
-  // localStoreInsertedCount, for state PERSISTING, it reflects
-  // persistentStoreInsertedCount, for others, it would be 0.
-  uint64 insertedRecordCount = 3;
+  // The count of scanned vector records for indexing.
+  uint64 scannedVectorRecordCount = 3;
+
+  // The count of indexed vector records.
+  uint64 indexedVectorRecordCount = 4;
 }
 
 message IndexStatusResponse {
@@ -106,4 +107,8 @@ service IndexService {
 
   // Garbage collect vertices identified as invalid before cutoff timestamp.
   rpc GcInvalidVertices(GcInvalidVerticesRequest) returns (google.protobuf.Empty) {}
+
+  // Indicates if indices are in sync across the cluster. This call will eventually return
+  // true when all nodes in the AVS cluster have the same copy of the index.
+  rpc AreIndicesInSync(google.protobuf.Empty) returns (Boolean) {}
 }
